@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SKEW</title>
+    <link rel="icon" type="image/x-icon" href="/static/icons/favicon.png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/boxicons.min.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <!-- Left side: menu + name -->
+        <div class="navbar-left">
+            <img src="/static/images/skew-logo-horizontal.png" alt="Logo" style="width: 100%; height: 25px;">
+        </div>
+    
+        <!-- Right side: notification + help -->
+        <div class="navbar-right">
+            {% if user %}
+                <div class="avatar" id="avatarBtn">{{ user[0].upper() }}</div>
+
+                <!-- Avatar Dropdown Menu (Hidden Initially) -->
+                <div id="avatarDropdown" class="avatar-dropdown">
+                    <div class="avatar-info">
+                        <div class="dropdown-avatar">{{ user[0].upper() }}</div>
+                        <div class="dropdown-username">{{ user }}</div>
+                    </div>
+                    <div class="avatar-links">
+                        {% if user != "superadmin" %}
+                        <div id="changePasswordBtn" class="avatar-link">Change Password</div>
+                        {% endif %}
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </div>
+                </div>
+            {% else %}
+                <button id="openLoginBtn">Login</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <ul>
+                {% if user %}
+                    <li class="{% if request.path == url_for('dashboard') %}active{% endif %}">
+                        <a href="{{ url_for('dashboard') }}"><i class="bx bxs-dashboard"></i> Dashboard</a>
+                    </li>
+                    <li class="{% if request.path == url_for('report') %}active{% endif %}">
+                        <a href="{{ url_for('report') }}"><i class="bx bxs-file-archive"></i> Report</a>
+                    </li>
+                    <li class="{% if request.path == url_for('recipe') %}active{% endif %}">
+                        <a href="{{ url_for('recipe') }}"><i class="bx bx-atom"></i> Recipe</a>
+                    </li>
+                    <li class="{% if request.path == url_for('stocks') %}active{% endif %}">
+                        <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
+                    </li>
+                    <li class="{% if request.path == url_for('logs') %}active{% endif %}">
+                        <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
+                    </li>
+                    {% if user == 'superadmin' %}
+                    <li class="{% if request.path == url_for('super_admin') %}active{% endif %}">
+                        <a href="{{ url_for('super_admin') }}"><i class="bx bxs-user-rectangle"></i> User Management</a>
+                    </li>
+                    {% endif %}
+                    <li class="{% if request.path == url_for('about') %}active{% endif %}">
+                        <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
+                    </li>
+                    <li class="{% if request.path == url_for('settings') %}active{% endif %}">
+                        <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
+                    </li>
+                {% else %}
+                    <li class="{% if request.path == url_for('dashboard') %}active{% endif %}">
+                        <a href="{{ url_for('dashboard') }}"><i class="bx bxs-dashboard"></i> Dashboard</a>
+                    </li>
+                    <li class="{% if request.path == url_for('report') %}active{% endif %}">
+                        <a href="{{ url_for('report') }}"><i class="bx bxs-file-archive"></i> Report</a>
+                    </li>
+                    <li class="{% if request.path == url_for('recipe') %}active{% endif %}">
+                        <a href="{{ url_for('recipe') }}"><i class="bx bx-atom"></i> Recipe</a>
+                    </li>
+                    <li class="{% if request.path == url_for('stocks') %}active{% endif %}">
+                        <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
+                    </li>
+                    <li class="{% if request.path == url_for('logs') %}active{% endif %}">
+                        <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
+                    </li>
+                    <li class="{% if request.path == url_for('about') %}active{% endif %}">
+                        <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
+                    </li>
+                    <li class="{% if request.path == url_for('settings') %}active{% endif %}">
+                        <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>        
+
+        <div class="main-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- 🔒 Change Password Modal -->
+    <div id="changePasswordModal" class="pass-modal">
+        <div class="pass-modal-content">
+            <span class="close" id="closePasswordModal">&times;</span>
+            <h2>Change Password</h2>
+            <form id="changePasswordForm">
+                <div class="form-group">
+                    <label for="oldPassword">Old Password</label>
+                    <input type="password" id="oldPassword" name="oldPassword" autocomplete="off" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" name="newPassword" autocomplete="off" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm New Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="off" required>
+                </div>
+                <button type="submit" class="login-btn">Change Password</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <form id="loginForm" method="POST">
+                <h2>Welcome</h2>
+                <p>Please login to continue</p>
+        
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" autocomplete="off" required>
+                </div>
+        
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" autocomplete="off" required>
+                </div>
+        
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const avatarBtn = document.getElementById('avatarBtn');
+            const avatarDropdown = document.getElementById('avatarDropdown');
+        
+            avatarBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent clicking outside
+                avatarDropdown.style.display = avatarDropdown.style.display === 'block' ? 'none' : 'block';
+            });
+        
+            // Close dropdown if clicking outside
+            document.addEventListener('click', () => {
+                avatarDropdown.style.display = 'none';
+            });
+        
+            avatarDropdown.addEventListener('click', (e) => {
+                e.stopPropagation(); // Allow clicking inside dropdown without closing
+            });
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const modal = document.getElementById("changePasswordModal");
+            const closeBtn = document.getElementById("closePasswordModal");
+            const openPassBtn = document.getElementById("changePasswordBtn");
+            const passForm = document.getElementById("changePasswordForm");
+        
+            // If you have a button or sidebar link for "Change Password", trigger this
+            openPassBtn && openPassBtn.addEventListener("click", () => {
+                modal.style.display = "block";
+            });
+        
+            closeBtn && closeBtn.addEventListener("click", () => {
+                modal.style.display = "none";
+            });
+        
+            window.addEventListener("click", (e) => {
+                if (e.target == modal) {
+                    modal.style.display = "none";
+                }
+            });
+        
+            passForm.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const oldPassword = document.getElementById("oldPassword").value.trim();
+                const newPassword = document.getElementById("newPassword").value.trim();
+                const confirmPassword = document.getElementById("confirmPassword").value.trim();
+        
+                if (newPassword !== confirmPassword) {
+                    alert("New passwords do not match!");
+                    return;
+                }
+
+                if (oldPassword === newPassword) {
+                    alert("New password and Old password should not be same!");
+                    return;
+                }
+        
+                fetch('/change_password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ oldPassword, newPassword })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert("Password changed successfully!");
+                        modal.style.display = "none";
+                    } else {
+                        alert("Error: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    alert("Failed to change password");
+                });
+            });
+        });
+    </script>        
+  
+    <script>
+        const modal = document.getElementById("loginModal");
+        const openBtn = document.getElementById("openLoginBtn");
+        const closeBtn = document.getElementById("closeModal");
+        const loginForm = document.getElementById("loginForm");
+        
+        openBtn && openBtn.addEventListener("click", () => {
+            modal.style.display = "block";
+        });
+        
+        closeBtn && closeBtn.addEventListener("click", () => {
+            modal.style.display = "none";
+        });
+        
+        window.onclick = (event) => {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        };
+        
+        loginForm.addEventListener('submit', function(event) {
+            event.preventDefault(); // prevent normal form submit
+        
+            const formData = new FormData(loginForm);
+        
+            fetch('/login', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Login successful
+                    modal.style.display = "none";
+                    window.location.href = '/home'; // Redirect to home page
+                } else {
+                    // Login failed
+                    alert(data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Something went wrong. Please try again.');
+            });
+        });
+    </script>
+        
+
+    {% if user %}
+    <script>
+        let inactivityTime = function () {
+            let timer;
+    
+            function logout() {
+                window.location.href = "/logout";
+                alert("Session timed out due to inactivity");
+                //window.location.reload();
+            }
+    
+            function resetTimer() {
+                clearTimeout(timer);
+                timer = setTimeout(logout, 5 * 60 * 1000); //5 minutes
+            }
+    
+            // Reset timer only when a backend request happens
+            document.addEventListener('click', function (e) {
+                const target = e.target.closest('a, button, input[type="submit"]');
+                if (target) {
+                    resetTimer();
+                }
+            });
+    
+            // Optional: Reset timer after XHR / fetch requests
+            const originalFetch = window.fetch;
+            window.fetch = function (...args) {
+                resetTimer();
+                return originalFetch.apply(this, args);
+            };
+    
+            // On page load (request made)
+            window.onload = resetTimer;
+        };
+    
+        inactivityTime();
+    </script>
+    {% endif %}
+      
+</body>
+</html>

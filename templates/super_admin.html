@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <div class="inv-navbar">
+        <!-- Left side: menu + name -->
+        <div class="inv-navbar-left">
+            <span class="inv-app-title">User Management</span>
+        </div>
+
+        <!-- Right side: notification + help -->
+        <div class="inv-navbar-right">
+            <!-- <button id="add-button" class="inv-button" {% if not user_logged_in %} disabled title="Login to add" {% endif %}>Add</button> -->
+            <input type="text" id="searchBox" class="inv-input" placeholder="Search..." autocomplete="off">
+        </div>
+    </div>
+
+    <!-- Display the DataFrame table -->
+    <div class="inventory-table-wrapper">
+        {{ table | safe }}
+    </div>
+
+    <!-- Password Edit Modal -->
+    <div id="passwordEditModal" class="pass-modal">
+        <div class="pass-modal-content">
+            <span class="close" id="passwordEditClose">&times;</span>
+            <h2>Update Password</h2>
+            <form id="passwordEditForm">
+                <div class="form-group">
+                    <label for="editUsername">Username</label>
+                    <input type="text" id="editUsername" name="editUsername" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" name="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required>
+                </div>
+                <button type="submit" class="login-btn">Update Password</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const searchInput = document.getElementById('searchBox');
+            const table = document.querySelector('.inventory-table-wrapper table');
+        
+            if (!table || !searchInput) return;
+        
+            searchInput.addEventListener('keyup', function () {
+                const filter = searchInput.value.toLowerCase();
+                const rows = table.querySelectorAll('tbody tr');
+        
+                rows.forEach(row => {
+                    const text = row.innerText.toLowerCase();
+                    row.style.display = text.includes(filter) ? '' : 'none';
+                });
+            });
+        });
+    </script>
+    
+    <script>
+        const userLoggedIn = {{ user_logged_in | tojson | safe }};
+    </script>
+    
+    <!-- ✅ Sorting, Search, and Edit -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const table = document.getElementById("inventory-table");
+            const headers = table.querySelectorAll("th");
+            let sortDirection = {};
+        
+            headers.forEach((header, index) => {
+                const baseText = header.textContent.trim();
+    
+                // Wrap the header content with span + arrow span
+                header.innerHTML = `<span class="header-label">${baseText}</span><span class="sort-arrow"></span>`;
+                header.style.position = "relative";
+                header.style.cursor = "pointer";
+        
+                header.addEventListener("click", () => {
+                    const rows = Array.from(table.querySelectorAll("tbody tr"));
+                    const direction = sortDirection[index] = !sortDirection[index];
+        
+                    // Update arrow for all headers
+                    headers.forEach((h, i) => {
+                        const arrowSpan = h.querySelector(".sort-arrow");
+                        if (arrowSpan) {
+                            arrowSpan.textContent = i === index ? (direction ? "▲" : "▼") : "";
+                        }
+                    });
+        
+                    rows.sort((a, b) => {
+                        const aText = a.children[index].textContent.trim();
+                        const bText = b.children[index].textContent.trim();
+                        const aVal = isNaN(aText) ? aText.toLowerCase() : parseFloat(aText);
+                        const bVal = isNaN(bText) ? bText.toLowerCase() : parseFloat(bText);
+                        
+                        if (aVal > bVal) return direction ? 1 : -1;
+                        if (aVal < bVal) return direction ? -1 : 1;
+                        
+                        return 0;
+                    });
+        
+                    const tbody = table.querySelector("tbody");
+                    tbody.innerHTML = "";
+                    rows.forEach(row => tbody.appendChild(row));
+                });
+            });
+        });
+    </script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const table = document.querySelector('.inventory-table-wrapper table');
+            if (!table) return;
+    
+            // Add Action column
+            const headerRow = table.querySelector('thead tr');
+            const actionHeader = document.createElement('th');
+            actionHeader.textContent = 'Action';
+            headerRow.appendChild(actionHeader);
+    
+            const headers = headerRow.querySelectorAll('th');
+    
+            table.querySelectorAll('tbody tr').forEach(row => {
+                const actionCell = document.createElement('td');
+                row.appendChild(actionCell);
+                addEditIcon(row, actionCell);
+            });
+    
+            function addEditIcon(row, cell) {
+                cell.innerHTML = `<i class='bx bx-edit' style='cursor:pointer; font-size:1.2rem;'></i>`;
+                const editIcon = cell.querySelector('i');
+    
+                if (!userLoggedIn) {
+                    editIcon.style.opacity = '0.5';
+                    editIcon.style.cursor = 'not-allowed';
+                    editIcon.title = 'Login required to edit';
+                    return;
+                }
+    
+                editIcon.addEventListener('click', () => {
+                    const username = row.children[1].textContent.trim(); // adjust index as needed
+                    document.getElementById("editUsername").value = username;
+                    document.getElementById("newPassword").value = "";
+                    document.getElementById("confirmPassword").value = "";
+
+                    const modal = document.getElementById("passwordEditModal");
+                    modal.style.display = "block";
+                });
+            }
+        });
+
+        const passwordModal = document.getElementById("passwordEditModal");
+        const closeModalBtn = document.getElementById("passwordEditClose");
+
+        closeModalBtn.onclick = () => {
+            passwordModal.style.display = "none";
+        };
+
+        window.onclick = (e) => {
+            if (e.target === passwordModal) {
+                passwordModal.style.display = "none";
+            }
+        };
+
+        // Form submission
+        document.getElementById("passwordEditForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+            const username = document.getElementById("editUsername").value;
+            const newPassword = document.getElementById("newPassword").value;
+            const confirmPassword = document.getElementById("confirmPassword").value;
+
+            if (newPassword !== confirmPassword) {
+                alert("Passwords do not match.");
+                return;
+            }
+
+            fetch("/update_user_password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, new_password: newPassword })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Password updated successfully.");
+                    passwordModal.style.display = "none";
+                    window.location.reload();
+                } else {
+                    alert("Error: " + data.error);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Failed to update password.");
+            });
+        });
+    </script>
+
+{% endblock %}

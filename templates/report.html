@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="inv-navbar">
+    <!-- Left side: menu + name -->
+    <div class="inv-navbar-left">
+        <span class="inv-app-title">Report</span>
+    </div>
+    <div class="inv-navbar-right">
+        <select>
+            <option value="1 Hr">1 Hr</option>
+            <option value="4 Hr">4 Hr</option>
+            <option value="8 Hr">8 Hr</option>
+            <option value="12 hr">12 Hr</option>
+            <option value="24 Hr">24 Hr</option>
+            <option value="Custom">Custom</option>
+        </select>
+        <div style="display: flex; gap: 0.15rem; align-items: center;">
+            <span>From:</span>
+            <input type="date">
+        </div>
+        <div style="display: flex; gap: 0.15rem; align-items: center;">
+            <span>To:</span>
+            <input type="date">
+        </div>
+        <button class="inv-button">View</button>
+        <button class="inv-button">Export</button>
+        <span>Total Batch Weight (in Tons) - &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    </div>
+</div>
+<div class="report-content">
+    
+</div>
+{% endblock %}

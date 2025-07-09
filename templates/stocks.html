@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="inv-navbar">
+    <!-- Left side: menu + name -->
+    <div class="inv-navbar-left">
+        <span class="inv-app-title">Stocks</span>
+    </div>
+</div>
+<div class="stocks-content">
+    <div class="left">
+        <form id="stocksForm" method="POST">
+            <div class="form-group">
+                <label for="silono">Silo No</label>
+                <input type="number" id="silono" name="silono" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="rawmaterialname">Raw Material Name</label>
+                <input type="text" id="rawmaterialname" name="rawmaterialname" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="rawmaterialcode">Raw Material Code</label>
+                <input type="text" id="rawmaterialcode" name="rawmaterialcode" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="operatorname">Operator Name</label>
+                <input type="text" id="operatorname" name="operatorname" autocomplete="off">
+            </div>
+            <div class="form-button">
+                <button type="submit" class="save-btn">Save</button>
+                <button type="submit" class="export-btn">Export</button>
+            </div>
+        </form>
+    </div>
+    <div class="right">
+
+    </div>
+</div>
+{% endblock %}
