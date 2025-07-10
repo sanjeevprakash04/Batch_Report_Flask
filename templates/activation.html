@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div id="licenseModal" class="license-modal" style="display: block;">
+        <div class="license-modal-content">
+            <h2>Activate License</h2>
+            <div class="form-group">
+                <label for="licenseKey">Enter License Key:</label>
+                <input type="text" id="licenseKey" placeholder="" autocomplete="off">
+            </div>
+            <div class="license-modal-actions">
+                <button id="activateBtn" class="inv-button">Activate</button>
+                <button id="launchBtn" class="inv-button" style="display:none;">Launch</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const activateBtn = document.getElementById('activateBtn');
+        const launchBtn = document.getElementById('launchBtn');
+        const licenseKeyInput = document.getElementById('licenseKey');
+
+        activateBtn.addEventListener('click', () => {
+            const licenseKey = licenseKeyInput.value.trim();
+            if (!licenseKey) return alert("Please enter license key");
+
+            fetch('/activate_license', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ licenseKey: licenseKey })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("✅ Activation successful");
+                    licenseKeyInput.disabled = true;
+                    activateBtn.style.display = 'none';
+                    launchBtn.style.display = 'inline-block';
+                } else {
+                    alert("❌ " + (data.message || "Activation failed"));
+                }
+            });
+        });
+
+        launchBtn.addEventListener('click', () => {
+            window.location.href = '/dashboard';
+        });
+    </script>
+{% endblock %}

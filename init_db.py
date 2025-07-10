@@ -2,7 +2,7 @@ import sqlite3
 from werkzeug.security import generate_password_hash
 
 # Connect to DB
-conn = sqlite3.connect('batch_report.db')
+conn = sqlite3.connect('BatchReportPLCDB2.db')
 cursor = conn.cursor()
 
 # Create table

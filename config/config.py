@@ -1,1 +1,1 @@
-DB_PATH = 'batch_report.db'  # SQLite database file path
+DB_PATH = 'BatchReportPLCDB2.db'  # SQLite database file path

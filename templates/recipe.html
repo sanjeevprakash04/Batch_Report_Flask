@@ -16,27 +16,35 @@
             <button class="inv-button">Save</button>
             <button class="inv-button">Delete</button>
             <button class="inv-button">Import</button>
-            <span>Selected Recipe - &nbsp;&nbsp;&nbsp;</span>
+            <span>Selected Recipe: &nbsp;&nbsp;&nbsp;</span>
             <div style="display: flex; gap: 0.15rem; align-items: center;">
                 <span>Mixer No:</span>
                 <input class="mix-no" type="text">
             </div>
-            <button class="icon-button"><i class="bx bxs-download"></i></button>
+            <div style="display: flex; gap: 0.15rem; align-items: center;">
+                <span>Download Recipe:</span>
+                <button class="icon-button"><i class="bx bxs-download"></i></button>
+            </div>
         </div>
     </div>
 </div>
 <div class="recipe-content">
-    <div class="left">
-        <input type="text" placeholder="Search...">
-        <div style="display: flex; gap: 0.4rem; align-items: left; padding-left: 0.2rem;">
-            <i class='bx bx-file-blank' style="font-size: 1.3rem; cursor: pointer; color: #666;"></i>
-            <i class='bx bx-trash' style="font-size: 1.3rem; cursor: pointer; color: #666;"></i>
+    <div class="top">
+        <div class="left">
+            <input type="text" placeholder="Search...">
+            <div style="display: flex; gap: 0.4rem; align-items: left; padding-left: 0.2rem;">
+                <i class='bx bxs-file-plus' style="font-size: 1.3rem; cursor: pointer; color: #666;"></i>
+                <i class='bx bxs-trash' style="font-size: 1.3rem; cursor: pointer; color: #666;"></i>
+            </div>
+            <div class="folders-files">
+
+            </div>
         </div>
-        <div class="folders-files">
+        <div class="right">
 
         </div>
     </div>
-    <div class="right">
+    <div class="bottom">
 
     </div>
 </div>

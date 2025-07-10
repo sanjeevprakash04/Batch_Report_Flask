@@ -43,52 +43,52 @@
             <ul>
                 {% if user %}
                     <li class="{% if request.path == url_for('dashboard') %}active{% endif %}">
-                        <a href="{{ url_for('dashboard') }}"><i class="bx bxs-dashboard"></i> Dashboard</a>
+                        <a href="{{ url_for('dashboard') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-dashboard"></i> Dashboard</a>
                     </li>
                     <li class="{% if request.path == url_for('report') %}active{% endif %}">
-                        <a href="{{ url_for('report') }}"><i class="bx bxs-file-archive"></i> Report</a>
+                        <a href="{{ url_for('report') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-file-archive"></i> Report</a>
                     </li>
                     <li class="{% if request.path == url_for('recipe') %}active{% endif %}">
-                        <a href="{{ url_for('recipe') }}"><i class="bx bx-atom"></i> Recipe</a>
+                        <a href="{{ url_for('recipe') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bx-list-ul"></i> Recipe</a>
                     </li>
                     <li class="{% if request.path == url_for('stocks') %}active{% endif %}">
-                        <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
+                        <a href="{{ url_for('stocks') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-box"></i> Stocks</a>
                     </li>
                     <li class="{% if request.path == url_for('logs') %}active{% endif %}">
-                        <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
+                        <a href="{{ url_for('logs') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxl-blogger"></i> Logs</a>
                     </li>
                     {% if user == 'superadmin' %}
                     <li class="{% if request.path == url_for('super_admin') %}active{% endif %}">
-                        <a href="{{ url_for('super_admin') }}"><i class="bx bxs-user-rectangle"></i> User Management</a>
+                        <a href="{{ url_for('super_admin') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-user-rectangle"></i> User Management</a>
                     </li>
                     {% endif %}
                     <li class="{% if request.path == url_for('about') %}active{% endif %}">
-                        <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
+                        <a href="{{ url_for('about') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-info-circle"></i> About</a>
                     </li>
                     <li class="{% if request.path == url_for('settings') %}active{% endif %}">
-                        <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
+                        <a href="{{ url_for('settings') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-cog"></i> Settings</a>
                     </li>
                 {% else %}
                     <li class="{% if request.path == url_for('dashboard') %}active{% endif %}">
-                        <a href="{{ url_for('dashboard') }}"><i class="bx bxs-dashboard"></i> Dashboard</a>
+                        <a href="{{ url_for('dashboard') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-dashboard"></i> Dashboard</a>
                     </li>
                     <li class="{% if request.path == url_for('report') %}active{% endif %}">
-                        <a href="{{ url_for('report') }}"><i class="bx bxs-file-archive"></i> Report</a>
+                        <a href="{{ url_for('report') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-file-archive"></i> Report</a>
                     </li>
                     <li class="{% if request.path == url_for('recipe') %}active{% endif %}">
-                        <a href="{{ url_for('recipe') }}"><i class="bx bx-atom"></i> Recipe</a>
+                        <a href="{{ url_for('recipe') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bx-list-ul"></i> Recipe</a>
                     </li>
                     <li class="{% if request.path == url_for('stocks') %}active{% endif %}">
-                        <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
+                        <a href="{{ url_for('stocks') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-box"></i> Stocks</a>
                     </li>
                     <li class="{% if request.path == url_for('logs') %}active{% endif %}">
-                        <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
+                        <a href="{{ url_for('logs') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxl-blogger"></i> Logs</a>
                     </li>
                     <li class="{% if request.path == url_for('about') %}active{% endif %}">
-                        <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
+                        <a href="{{ url_for('about') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-info-circle"></i> About</a>
                     </li>
                     <li class="{% if request.path == url_for('settings') %}active{% endif %}">
-                        <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
+                        <a href="{{ url_for('settings') }}"><i style="font-size: 1.2rem; color: #444;" class="bx bxs-cog"></i> Settings</a>
                     </li>
                 {% endif %}
             </ul>

@@ -1,12 +1,34 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort, g, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
-
+import pandas as pd
 #Modules
-from auth import authLog
+from auth import authLog, authMac
 from config import sqliteConfig
 
 app = Flask(__name__)
 app.secret_key = '4f3d6e9a5f4b1c8d7e6a2b3c9d0e8f1a5b7c2d4e6f9a1b3c8d0e6f2a9b1d3c4'
+
+# def is_activated():
+#     try:
+#         conn = sqliteConfig.get_db_connection_engine()
+#         df = pd.read_sql_query('SELECT * FROM "Info_DB"', con=conn)
+        
+#         activation_row = df.loc[df['Particulars'] == 'Activation_Key', 'Info']
+        
+#         if activation_row.empty:
+#             return False
+        
+#         activation_key = activation_row.values[0]
+#         return bool(activation_key and str(activation_key).strip())
+#     except Exception as e:
+#         print("Activation check error:", e)
+#         return False
+
+# @app.route('/')
+# def index():
+#     if not is_activated():
+#         return render_template('activation.html')
+#     return redirect(url_for('home'))
 
 @app.route('/')
 @app.route('/home')
@@ -15,6 +37,16 @@ def home():
         return redirect(url_for('dashboard', user=session['username'], role=session.get('role')))
     else:
         return redirect(url_for('dashboard'))
+    
+# @app.route('/activate_license', methods=['POST'])
+# def activate_license():
+#     data = request.get_json()
+#     license_key = data.get('licenseKey')
+
+#     result = authMac.mac_insert(license_key)
+#     success = result and "successfully updated" in result.lower()
+
+#     return jsonify(success=success, message=result)
 
 @app.route('/dashboard')
 def dashboard():
