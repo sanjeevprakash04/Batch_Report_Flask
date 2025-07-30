@@ -4,7 +4,7 @@ from sqlalchemy import text
 import datetime
 from datetime import datetime, date, timedelta
 
-from config import sqliteConfig
+from config import postgreGetCon
 import pandas as pd
 
 # from skewFrontendUI import Ui_MainWindow
@@ -23,24 +23,21 @@ def mac_insert(styEnckey):
     try:
         # Open connections
         
-        conn = sqliteConfig.get_db_connection()
+        conn = postgreGetCon.get_db_connection()
         cursorRead = conn.cursor()
         cursorWrite = conn.cursor()
-        engineConRead = sqliteConfig.get_db_connection_engine()
+        engineConRead = postgreGetCon.get_db_connection_engine()
         engineConWrite = engineConRead  # can be the same engine
 
-        print(cursorRead, cursorWrite, engineConRead, engineConWrite, conn)
 
         # Read data from Info_DB
         query = text('SELECT * FROM "Info_DB"')
         dfInfo = pd.read_sql_query(query, engineConRead)
-        print(dfInfo)
-
         # Update Software_sold_date if empty
         if dfInfo.loc[dfInfo['Particulars'] == 'Software_sold_date', 'Info'].isnull().values[0]:
-            print("Test")
+
             date_now = date.today().isoformat()
-            print("Date now:", date_now)
+
             enc_date = encrypt_date(date_now)
             query = """UPDATE "Info_DB" SET "Info" = %s WHERE "Particulars" = %s"""
             cursorWrite.execute(query, (enc_date, "Software_sold_date"))
@@ -50,14 +47,13 @@ def mac_insert(styEnckey):
         mac = gma(interface="Ethernet")
 
         if styEnckey:
-            print("In if") 
+
             if styEnckey == "gAAAAABmzFfoZWkCZCOAZAIMhI3u34OIaOJV990lC0zp2SHVZdebf2Oe_CuFjS4ngG3Pe33bs5pe6KfMNOI9M8MTeUvZc0BjCw==":
                 enc_msg, s_version = encrypt(mac, styEnckey)
-                print("Encrypted Message:", enc_msg) 
-                print("Decrypted Version:", s_version)
+                
                 dec = decrypt(enc_msg)
                 dec_key = s_version + dec
-                print("Concatenated Encryption Key:", dec_key)
+                
                 enc_key, _ = encrypt(dec_key, styEnckey)
                 enc_key_str = base64.b64encode(enc_key).decode('utf-8')
                 query = """UPDATE "Info_DB" SET "Info" = %s WHERE "Particulars" = %s"""
@@ -66,10 +62,10 @@ def mac_insert(styEnckey):
                 # msg = 'Licence Activation successfully updated'
                 # Ui_MainWindow.popUp(msg)
             else:
-                print("in else")
+                
                 key = base64.b64decode(styEnckey).decode('utf-8')
                 deckey = decrypt(key)
-                print(deckey)
+                
                 mac_inserted = deckey[-17:]
                 stype = int(deckey[:-17])
                 if mac_inserted == mac:
@@ -79,26 +75,18 @@ def mac_insert(styEnckey):
                     return "Licence Activation successfully updated"
 
         elif styEnckey =="":
-            print("IN Elif") 
+            
             active_key = dfInfo.loc[4, 'Info']
             key = base64.b64decode(active_key).decode('utf-8')
             deckey = decrypt(key)
             stype = int(deckey[:-17])
 
-            # count = len(deckey)
-            # print('count:', count)
-            # if count == 18:
-            #     stype = deckey[0]
-            # else:
-            #     stype = deckey[:2]
-
             styEnckey, _ = encrypt(str(stype), key)
             enc_msg, s_version = encrypt(mac, styEnckey)
-            print("Encrypted Message:", enc_msg)
-            print("Decrypted Version:", s_version)
+            
             dec = decrypt(enc_msg)
             dec_key = s_version + dec
-            print("Concatenated Encryption Key:", dec_key)
+
             enc_key, _ = encrypt(dec_key, styEnckey)
             enc_key_str = base64.b64encode(enc_key).decode('utf-8')
             query = """UPDATE "Info_DB" SET "Info" = %s WHERE "Particulars" = %s"""
@@ -155,14 +143,13 @@ def licence_dec(df):
         Activation_Key = df.loc[4, 'Info']
         Activation_Key = base64.b64decode(Activation_Key).decode('utf-8')
         dec_key = decrypt(Activation_Key)
-        print(dec_key)
+        
         
         mac = dec_key[-17:]
         softwaretype = int(dec_key[:-17])
        
 
 
-        print(f"Software Type: {softwaretype}, MAC: {mac}")
         # Initialize 'Software_sold_date' to an empty string
         Software_sold_date = ''
 
@@ -180,13 +167,11 @@ def licence_dec(df):
 def validate(mac, softwaretype, Software_sold_date):          
     try:
         # Assuming the date format is 'DD/MM/YYYY'
-        print(mac, softwaretype, Software_sold_date)
         auth_status = 0
 
         current_date = datetime.now()
-        print(current_date)
         Software_sold_date = datetime.strptime(Software_sold_date, '%d/%m/%Y')
-        print(Software_sold_date)
+        
         if gma(0) == mac:
             auth_status = 1 
             if softwaretype == 0:

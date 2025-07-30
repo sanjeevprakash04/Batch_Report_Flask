@@ -3,50 +3,49 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import pandas as pd
 #Modules
 from auth import authLog, authMac
-from config import sqliteConfig
+from config import postgreGetCon
 
 app = Flask(__name__)
 app.secret_key = '4f3d6e9a5f4b1c8d7e6a2b3c9d0e8f1a5b7c2d4e6f9a1b3c8d0e6f2a9b1d3c4'
 
-# def is_activated():
-#     try:
-#         conn = sqliteConfig.get_db_connection_engine()
-#         df = pd.read_sql_query('SELECT * FROM "Info_DB"', con=conn)
+def is_activated():
+    try:
+        conn = postgreGetCon.get_db_connection_engine()
+        df = pd.read_sql_query('SELECT * FROM "Info_DB"', con=conn)
         
-#         activation_row = df.loc[df['Particulars'] == 'Activation_Key', 'Info']
+        activation_row = df.loc[df['Particulars'] == 'Activation_Key', 'Info']
         
-#         if activation_row.empty:
-#             return False
-        
-#         activation_key = activation_row.values[0]
-#         return bool(activation_key and str(activation_key).strip())
-#     except Exception as e:
-#         print("Activation check error:", e)
-#         return False
-
-# @app.route('/')
-# def index():
-#     if not is_activated():
-#         return render_template('activation.html')
-#     return redirect(url_for('home'))
+        if activation_row.empty:
+            return False
+         
+        activation_key = activation_row.values[0]
+        return bool(activation_key and str(activation_key).strip())
+    except Exception as e:
+        print("Activation check error:", e)
+        return False
 
 @app.route('/')
+def index():
+    if not is_activated():
+        return render_template('activation.html')
+    return redirect(url_for('home'))
+
+@app.route('/activate_license', methods=['POST'])
+def activate_license():
+    data = request.get_json()
+    license_key = data.get('licenseKey')
+
+    result = authMac.mac_insert(license_key)
+    success = result and "successfully updated" in result.lower()
+
+    return jsonify(success=success, message=result)
+
 @app.route('/home')
 def home():
     if 'username' in session:
         return redirect(url_for('dashboard', user=session['username'], role=session.get('role')))
     else:
         return redirect(url_for('dashboard'))
-    
-# @app.route('/activate_license', methods=['POST'])
-# def activate_license():
-#     data = request.get_json()
-#     license_key = data.get('licenseKey')
-
-#     result = authMac.mac_insert(license_key)
-#     success = result and "successfully updated" in result.lower()
-
-#     return jsonify(success=success, message=result)
 
 @app.route('/dashboard')
 def dashboard():
@@ -79,7 +78,7 @@ def about():
 @app.route('/super_admin')
 def super_admin():
     user_logged_in = 'username' in session
-    df = sqliteConfig.dfUser()
+    df = postgreGetCon.dfUser()
     table_html = df.to_html(classes='table table-striped', index=False, escape=False, table_id='inventory-table')
     return render_template('super_admin.html', table=table_html, user_logged_in=user_logged_in)
 
@@ -93,7 +92,7 @@ def update_user_password():
         return jsonify(success=False, error="Invalid data")
 
     try:
-        conn = sqliteConfig.get_db_connection()
+        conn = postgreGetCon.get_db_connection()
         cur = conn.cursor()
         hashed = generate_password_hash(new_password)
 
@@ -130,7 +129,7 @@ def change_password():
 
     username = session['username']
 
-    conn = sqliteConfig.get_db_connection()
+    conn = postgreGetCon.get_db_connection()
     if conn is None:
         return jsonify(success=False, error="Database connection error"), 500
 
