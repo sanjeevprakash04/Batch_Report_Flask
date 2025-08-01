@@ -21,14 +21,9 @@ from datetime import datetime
 
 def mac_insert(styEnckey):
     try:
-        # Open connections
-        
-        conn = postgreGetCon.get_db_connection()
-        cursorRead = conn.cursor()
-        cursorWrite = conn.cursor()
-        engineConRead = postgreGetCon.get_db_connection_engine()
-        engineConWrite = engineConRead  # can be the same engine
-
+        # Open connections        
+        conn, cursorRead, cursorWrite = postgreGetCon.get_db_connection()
+        engine, engineConRead, engineConWrite = postgreGetCon.get_db_connection_engine()
 
         # Read data from Info_DB
         query = text('SELECT * FROM "Info_DB"')

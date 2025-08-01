@@ -14,7 +14,9 @@ def get_db_connection():
             port=DB_CONFIG['port'],
             cursor_factory=DictCursor
         )
-        return conn
+        cursorRead = conn.cursor()
+        cursorWrite = conn.cursor()
+        return conn, cursorRead, cursorWrite
     except Exception as e:
         print(f"Failed to connect to PostgreSQL: {e}")
         return None
@@ -26,7 +28,9 @@ def get_db_connection_engine():
             f"{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['dbname']}"
         )
         engine = create_engine(db_url)
-        return engine
+        engineConRead = engine.connect()
+        engineConWrite = engine.connect()
+        return engine, engineConRead, engineConWrite
     except Exception as e:
         print(f"Failed to create SQLAlchemy engine: {e}")
         return None
@@ -43,7 +47,7 @@ def insertBatch(df):
     print("Starting batch insertion...")
 
     # Get PostgreSQL connections
-    cursorRead, cursorWrite, engineConRead, engineConWrite, conn = sqlite()  # Rename function if needed
+    engine, engineConRead, engineConWrite = get_db_connection_engine()  # Rename function if needed
 
     if df.empty:
         print("Dataframe is empty. No data to insert.")
@@ -83,9 +87,9 @@ def insertBatch(df):
         # Insert into PostgreSQL using to_sql
         try:
             df_pivot_1.to_sql("batches", con=engineConWrite, if_exists="append", index=False, method='multi')
-            print("✅ Batch metadata inserted successfully into PostgreSQL.")
+            print("Batch metadata inserted successfully into PostgreSQL.")
         except Exception as e:
-            print(f"❌ Error during PostgreSQL insertion: {e}")
+            print(f"Error during PostgreSQL insertion: {e}")
 
     print("Batch insertion completed.")
 
@@ -126,10 +130,10 @@ def insertMaterialExtraction(dfPlcdb, engineConRead, cursorWrite, conn):
             cursorWrite.execute(update_query, (row['TotalWeight'], row['MaterialName']))
 
         conn.commit()
-        print("✅ TotalWeight values successfully updated in MaterialData (PostgreSQL).")
+        print("TotalWeight values successfully updated in MaterialData (PostgreSQL).")
 
     except Exception as e:
-        print("❌ Error occurred:", e)
+        print("Error occurred:", e)
 
 
 

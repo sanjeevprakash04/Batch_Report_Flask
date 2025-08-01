@@ -1,17 +1,19 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort, g, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 import pandas as pd
+from threading import Thread
+
 #Modules
 from auth import authLog, authMac
 from config import postgreGetCon
-
+from modules import monitor, main
 app = Flask(__name__)
 app.secret_key = '4f3d6e9a5f4b1c8d7e6a2b3c9d0e8f1a5b7c2d4e6f9a1b3c8d0e6f2a9b1d3c4'
 
 def is_activated():
     try:
-        conn = postgreGetCon.get_db_connection_engine()
-        df = pd.read_sql_query('SELECT * FROM "Info_DB"', con=conn)
+        engine, engineConRead, engineConWrite = postgreGetCon.get_db_connection_engine()
+        df = pd.read_sql_query('SELECT * FROM "Info_DB"',engineConRead)
         
         activation_row = df.loc[df['Particulars'] == 'Activation_Key', 'Info']
         
@@ -168,6 +170,26 @@ def change_password():
 def logout():
     session.clear()
     return redirect(url_for('home'))
+
+@app.before_request
+def start_plc_monitoring():
+    if not monitor.plc_running:
+        # print("🔥 Starting PLC monitoring...")
+        monitor.plc_running = True
+        monitor.plc_thread = Thread(target=monitor.trigger_connect)
+        monitor.plc_thread.daemon = True
+        monitor.plc_thread.start()
+        # print(" PLC monitoring started on app start.")
+
+@app.route('/stop_plc', methods=['POST'])
+def stop_plc():
+    # print(" /stop_plc endpoint called!")
+    if monitor.plc_running:
+        monitor.plc_running = False
+        # print(" PLC monitoring stopped on tab/window close.")
+    # print(" Terminating server process.")
+    # os._exit(0)
+    return '', 204
 
 @app.errorhandler(403)
 def forbidden(e):

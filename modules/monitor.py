@@ -18,6 +18,7 @@ handler.setFormatter(formatter)
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 root_logger.addHandler(handler)
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 # === Global Variables ===
 plc_running = False
@@ -42,7 +43,7 @@ def df_split(dfPlcdb):
         else:
             return dfPlcdb, pd.DataFrame()
     except Exception as e:
-        logging.error(f"❌ Error in df_split: {e}")
+        logging.error(f"Error in df_split: {e}")
         return dfPlcdb, pd.DataFrame()
 
 async def monitor_loop(plc, dfPlcdb):
@@ -52,24 +53,25 @@ async def monitor_loop(plc, dfPlcdb):
             await monitor_triggers(plc, dfPlcdb)
             await asyncio.sleep(5)
     except asyncio.CancelledError:
-        logging.warning("🛑 Monitor loop cancelled.")
+        logging.warning("Monitor loop cancelled.")
     finally:
         plc.Close()
-        logging.info("🔌 PLC connection closed.")
+        logging.info("PLC connection closed.")
 
 def trigger_connect():
     global plc_running
     try:
-        conn = postgreGetCon.get_db_connection_engine()
-        dfInfo = pd.read_sql_query('SELECT * FROM "Info_DB";', conn)
-        dfPlcdb = pd.read_sql_query('SELECT * FROM "Data";', conn)
+        print("Connecting to PLC...")
+        engine, engineConRead, engineConWrite = postgreGetCon.get_db_connection_engine()
+        dfInfo = pd.read_sql_query('SELECT * FROM "Info_DB";', engineConRead)
+        dfPlcdb = pd.read_sql_query('SELECT * FROM "Data";', engineConRead)
 
         plcIP = dfInfo.loc[0, 'Info']
         plc = pylogix.connectABPLC(plcIP)
         status = plc.GetPLCTime()
 
         if status.Status == 'Success':
-            logging.info("✅ PLC is connected.")
+            logging.info("PLC is connected.")
             plc_running = True
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -84,16 +86,17 @@ def trigger_connect():
             loop.close()
             return "Monitoring stopped"
         else:
-            logging.error(f"❌ PLC connection failed: {status.Status}")
-            return f"❌ PLC connection failed: {status.Status}"
+            logging.error(f"PLC connection failed: {status.Status}")
+            return f"PLC connection failed: {status.Status}"
 
     except Exception as e:
-        logging.exception("❌ Error in trigger_connect:")
+        logging.exception(" Error in trigger_connect:")
         set_latest_data({"msg": f"PLC is not connected: {e}"})
         return f"Error: {e}"
 
 async def monitor_triggers(plc, dfPlcdb):
     try:
+        print("Monitoring...")
         if not plc:
             return False
 
@@ -102,11 +105,11 @@ async def monitor_triggers(plc, dfPlcdb):
         trigger_tags, df_trigger = pylogix.monitor_trigger_ab(plc, df_trigger)
 
         if not pylogix.lifeCounter(plc, dfPlcdb):
-            logging.warning("❌ PLC disconnected during monitoring.")
+            logging.warning(" PLC disconnected during monitoring.")
             return False
 
         if trigger_tags:
-            logging.info(f"⚡ Trigger tags active: {trigger_tags}")
+            logging.info(f"Trigger tags active: {trigger_tags}")
             for tag in trigger_tags:
                 df_active = globals().get(tag)
                 if df_active is not None:
@@ -116,17 +119,18 @@ async def monitor_triggers(plc, dfPlcdb):
                 lambda row: pylogix.reset_trigger_tag_ab(plc, row['Tag_name']),
                 axis=1
             )
-            logging.info("🔁 Trigger tags reset")
+            logging.info("Trigger tags reset")
 
         return True
 
     except Exception as e:
-        logging.exception("❌ Error in monitor_triggers:")
+        logging.exception(" Error in monitor_triggers:")
         return False
 
 def run_logging(plc, df_Trigger_active_tag):
     try:
         conn, cursor = postgreGetCon.get_db_connection()
+
         df_Trigger_active_tag = df_Trigger_active_tag.reset_index(drop=True)
 
         dfInfo = pd.read_sql("SELECT * FROM info_db", conn)
@@ -159,7 +163,7 @@ def run_logging(plc, df_Trigger_active_tag):
                     df_Trigger_active_tag.loc[df_Trigger_active_tag['Tag_name'] == ret.TagName, 'Value'] = ret.Value
 
             if df_Trigger_active_tag['Value'].isnull().any():
-                raise ValueError("❗ Null values found in PLC read.")
+                raise ValueError("Null values found in PLC read.")
 
             category_0 = df_Trigger_active_tag.loc[
                 (df_Trigger_active_tag['Name'] == "SetWeight") & 
@@ -191,9 +195,9 @@ def run_logging(plc, df_Trigger_active_tag):
             postgreGetCon.insertMaterialExtraction(df_Trigger_active_tag, conn, cursor)
 
             df_live = df_Trigger_active_tag[['Timestamp', 'Category', 'Name', 'Data_type', 'Value']]
-            logging.info(f"📥 Data logged successfully at {timestamp}")
+            logging.info(f"Data logged successfully at {timestamp}")
             return df_live
 
     except Exception as e:
-        logging.exception("❌ Error in run_logging:")
+        logging.exception(" Error in run_logging:")
         return None
