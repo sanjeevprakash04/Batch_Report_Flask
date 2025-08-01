@@ -1,4 +1,4 @@
-from config.sqliteConfig import get_db_connection
+from config.postgreGetCon import get_db_connection
 
 from werkzeug.security import check_password_hash
 from datetime import datetime
