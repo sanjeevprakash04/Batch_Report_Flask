@@ -1,20 +1,22 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="inv-navbar">
+<div class="inv-navbar recipe">
     <!-- Left side: page title -->
-    <div class="inv-navbar-left">
+    <div class="inv-navbar-left recipe">
         <span class="inv-app-title">Recipe List</span>
-    </div>
-
-    <!-- Right side: import and download options -->
-    <div class="inv-navbar-right">
         <div class="list-opt">
             <button class="icon-button" title="Import"><i class="bx bx-import"></i></button>
             <button class="icon-button" title="Export"><i class="bx bx-export"></i></button>
         </div>
+    </div>
+
+    <!-- Right side: import and download options -->
+    <div class="inv-navbar-right recipe">
         <div class="table-opt">
-            <span>Selected Recipe -</span>
+            <button class="add-btn" id="addRowBtn">Add</button>
+            <button id="importBtn" class="inv-button">Export</button>
+            <span>Selected Recipe: --</span>
             <div style="display: flex; gap: 0.3rem; align-items: center;">
                 <span>Mixer No:</span>
                 <input class="mix-no" type="text" />
@@ -51,10 +53,6 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/recipe.css') }}">
 {% endblock %}
 
 {% block scripts %}

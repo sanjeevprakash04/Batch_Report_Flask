@@ -1,0 +1,243 @@
+{% extends "devicehub.html" %}
+
+{% block devicehub_devices %}
+<div style="display: flex; justify-content: right; margin-top: 1rem;">
+    <button id="add-button" class="table-button" style="margin-left: 0.5rem; margin-right: 0.5rem" {% if not user_logged_in %} disabled title="Login to add"{% endif %}>New Device</button>
+</div>
+
+<div class="inventory-table-wrapper" style="margin-top: 1rem;">
+    {{ table1 | safe }}
+</div>
+
+<!-- Modal -->
+<div id="newDeviceModal" class="new-device-modal" style="display: none;">
+    <div class="newdevice-modal-content">
+        <form id="newDeviceForm" method="POST" action="{{ url_for('devicehub_add_device') }}">
+            <h2>Data Connection</h2>
+
+            <div class="form-group">
+                <label for="plctype">PLC Type&nbsp;<small class="error-message" id="plctype-error"></small></label>
+                <select id="plctype" name="plctype" required onchange="handlePLCTypeChange(); validateForm();">
+                    <option value="">-- Select PLC --</option>
+                    <option value="PLC-1">Siemens S7-1200/1500 TCP</option>
+                    <option value="PLC-2">Siemens S7-300/400 TCP</option>
+                    <option value="PLC-3">AllenBradley Control/Compac logix TCP</option>
+                    <option value="PLC-4">Modbus TCP</option>
+                    <option value="PLC-5">OPC Server</option>
+                </select>
+            </div>
+
+            <div class="form-group plc-field plc-name" style="display: none;">
+                <label for="plcname">Name&nbsp;<small class="error-message" id="plcname-error"></small></label>
+                <input type="text" id="plcname" name="plcname" autocomplete="off" required>
+            </div>
+
+            <!-- Conditionally visible fields -->
+            <div class="form-group plc-field plc-ip" style="display: none;">
+                <label for="ipaddress">IP Address&nbsp;<small class="error-message" id="ipaddress-error"></small></label>
+                <input type="text" id="ipaddress" name="ipaddress" autocomplete="off">
+            </div>
+
+            <div class="form-group plc-field plc-port" style="display: none;">
+                <label for="port">Port&nbsp;<small class="error-message" id="port-error"></small></label>
+                <input type="number" id="port" name="port" autocomplete="off">
+            </div>
+
+            <div class="form-group plc-field plc-rack-slot" style="display: none;">
+                <label for="rack">Rack&nbsp;<small class="error-message" id="rack-error"></small></label>
+                <input type="number" id="rack" name="rack" autocomplete="off">
+            </div>
+
+            <div class="form-group plc-field plc-rack-slot" style="display: none;">
+                <label for="slot">Slot&nbsp;<small class="error-message" id="slot-error"></small></label>
+                <input type="number" id="slot" name="slot" autocomplete="off">
+            </div>
+
+            <div class="action-buttons">
+                <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="create-btn" id="create-btn" disabled>Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const userLoggedIn = {{ user_logged_in | tojson | safe }};
+</script>
+
+<script>
+// Modal show
+document.getElementById('add-button').addEventListener('click', () => {
+    document.getElementById('newDeviceModal').style.display = 'block';
+    resetFormFields();
+});
+
+// Modal close
+function closeModal() {
+    document.getElementById('newDeviceModal').style.display = 'none';
+    document.getElementById('newDeviceForm').reset();
+    clearErrors();
+    resetFormFields();
+    document.getElementById('create-btn').disabled = true;
+}
+
+// Hide all conditional fields
+function resetFormFields() {
+    document.querySelectorAll('.plc-field').forEach(field => field.style.display = 'none');
+}
+
+// Clear error messages
+function clearErrors() {
+    document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
+}
+
+// PLC type field toggling
+function handlePLCTypeChange() {
+    resetFormFields();
+    const plcType = document.getElementById('plctype').value;
+    if (['PLC-1', 'PLC-2'].includes(plcType)) {
+        showFields(['plc-name', 'plc-ip', 'plc-rack-slot']);
+    } else if (plcType === 'PLC-3') {
+        showFields(['plc-name', 'plc-ip']);
+    } else if (plcType === 'PLC-4') {
+        showFields(['plc-name', 'plc-ip', 'plc-port']);
+    } else if (plcType === 'PLC-5') {
+        showFields(['plc-name', 'plc-ip']);
+    }
+}
+
+// Display fields
+function showFields(classes) {
+    classes.forEach(cls => {
+        document.querySelectorAll(`.${cls}`).forEach(field => field.style.display = 'block');
+    });
+}
+
+// Real-time validation
+document.querySelectorAll('#newDeviceForm input, #newDeviceForm select').forEach(input => {
+    input.addEventListener('input', validateForm);
+});
+
+let plcNameAvailable = false;
+let plcNameChecked = false; // Tracks if a uniqueness check has been done
+
+function validateForm() {
+    // Clear all errors except PLC name uniqueness error
+    document.querySelectorAll('.error-message').forEach(el => {
+        if (el.id !== 'plcname-error' || (plcNameChecked && plcNameAvailable)) {
+            el.textContent = '';
+        }
+    });
+
+    const plcName = document.getElementById('plcname').value.trim();
+    const plcType = document.getElementById('plctype').value;
+    let valid = true;
+
+    if (!plcName) {
+        document.getElementById('plcname-error').textContent = "* Name is required.";
+        valid = false;
+        plcNameAvailable = false;
+    }
+
+    if (!plcType) {
+        document.getElementById('plctype-error').textContent = "* PLC Type is required.";
+        valid = false;
+    }
+
+    if (['PLC-1', 'PLC-2'].includes(plcType)) {
+        if (!document.getElementById('ipaddress').value.trim()) {
+            document.getElementById('ipaddress-error').textContent = "* IP Address is required.";
+            valid = false;
+        }
+        if (!document.getElementById('rack').value.trim()) {
+            document.getElementById('rack-error').textContent = "* Rack is required.";
+            valid = false;
+        }
+        if (!document.getElementById('slot').value.trim()) {
+            document.getElementById('slot-error').textContent = "* Slot is required.";
+            valid = false;
+        }
+    } else if (plcType === 'PLC-3') {
+        if (!document.getElementById('ipaddress').value.trim()) {
+            document.getElementById('ipaddress-error').textContent = "* IP Address is required.";
+            valid = false;
+        }
+    } else if (plcType === 'PLC-4') {
+        if (!document.getElementById('ipaddress').value.trim()) {
+            document.getElementById('ipaddress-error').textContent = "* IP Address is required.";
+            valid = false;
+        }
+        if (!document.getElementById('port').value.trim()) {
+            document.getElementById('port-error').textContent = "* Port is required.";
+            valid = false;
+        }
+    } else if (plcType === 'PLC-5') {
+        if (!document.getElementById('ipaddress').value.trim()) {
+            document.getElementById('ipaddress-error').textContent = "* IP Address is required.";
+            valid = false;
+        }
+    }
+
+    // Disable create if any validation fails or if PLC name is unavailable
+    document.getElementById('create-btn').disabled = !valid || !plcNameAvailable;
+}
+
+// PLC name uniqueness check
+document.getElementById('plcname').addEventListener('input', function() {
+    const name = this.value.trim();
+    if (!name) {
+        plcNameAvailable = false;
+        plcNameChecked = false;
+        document.getElementById('plcname-error').textContent = "* Name is required.";
+        document.getElementById('create-btn').disabled = true;
+        return;
+    }
+
+    // Debounce to avoid too many calls
+    clearTimeout(this._checkTimeout);
+    this._checkTimeout = setTimeout(() => {
+        fetch(`/check_plc_name?name=${encodeURIComponent(name)}`)
+            .then(response => response.json())
+            .then(data => {
+                plcNameChecked = true;
+                plcNameAvailable = data.available;
+                if (!plcNameAvailable) {
+                    document.getElementById('plcname-error').textContent = "* This PLC name already exists. Enter a different name.";
+                } else {
+                    document.getElementById('plcname-error').textContent = "";
+                }
+                validateForm();
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                plcNameAvailable = false;
+                plcNameChecked = false;
+                document.getElementById('create-btn').disabled = true;
+            });
+    }, 400);
+});
+
+// Handle form submission with fetch
+document.getElementById('newDeviceForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.reload(); // refresh table
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(err => console.error("Error:", err));
+});
+</script>
+
+{% endblock %}

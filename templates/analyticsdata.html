@@ -1,14 +1,9 @@
-{% extends 'base.html' %}
-{% block content %}
-
+{% extends 'analytics.html' %}
+{% block analytics_dataview %}
 <!-- ===============================
-      REPORT HEADER
+      ANALYTICS HEADER
 =============================== -->
-<div class="inv-navbar">
-  <div class="inv-navbar-left">
-    <span class="inv-app-title">Report</span>
-  </div>
-
+<div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem;">
   <div class="inv-navbar-right">
     <select id="hourSelect" class="inv-select">
       <option value="1 Hr">1 Hr</option>
@@ -30,12 +25,13 @@
 
     <button id="viewBtn" class="inv-button">View</button>
     <button id="exportBtn" class="inv-button">Export</button>
+    <button id="analyticsBtn" class="inv-button">Analytics</button>
     <span id="totalLabel" class="total-label">Total Batch Weight (in Tons): --</span>
   </div>
 </div>
 
 <!-- ===============================
-      REPORT TABLE
+      ANALYTICS TABLE
 =============================== -->
 <div class="report-table-wrapper">
   <table class="inv-table" id="reportTable">

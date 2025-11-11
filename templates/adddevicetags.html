@@ -1,0 +1,317 @@
+{% extends "devicehub.html" %}
+
+{% block devicehub_tags %}
+<div style="display: flex; justify-content: right; margin-top: 1rem;">
+    <select class="table-select" id="plc-select">
+        <option value="all">All Tags</option>
+        {% for plc in plc_list %}
+        <option value="{{ plc['Id'] }}">{{ plc['Name']}}</option>
+        {% endfor %}
+    </select>
+    <button id="add-button" class="table-button" style="margin-left: 0.5rem;" {% if not user_logged_in %} disabled title="Login to add"{% endif %}>New Tag</button>
+    <button id="imp-button" class="table-button" style="margin-left: 0.5rem;" {% if not user_logged_in %} disabled title="Login to import"{% endif %}>Import</button>
+    <input type="file" id="excel-input" accept=".xlsx, .xls" style="display: none;" />
+    <button id="exp-button" class="table-button" style="margin-left: 0.5rem; margin-right: 0.5rem" {% if not user_logged_in %} disabled title="Login to export"{% endif %}>Export</button>
+</div>
+<div class="inventory-table-wrapper" style="margin-top: 1rem;">
+    {{ table2 | safe }}
+</div>
+
+<!-- Modal -->
+<div id="newTagModal" class="new-tag-modal" style="display: none;">
+    <div class="newtag-modal-content">
+        <form id="newTagForm" method="POST" action="{{ url_for('devicehub_add_tag') }}">
+            <h2>Tag Connection</h2>
+
+            <div class="form-group-main">
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="name" autocomplete="off" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <input type="text" id="category" name="category" autocomplete="off" required>
+                </div>
+            </div>
+
+            <div class="form-group-main">
+                <div class="form-group">
+                    <label for="tag_name">Tag Name</label>
+                    <input type="text" id="tag_name" name="tag_name" autocomplete="off" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="data_type">Data Type</label>
+                    <select id="data_type" name="data_type">
+                        <option value="">-- Select --</option>
+                        <option value="INT">INT</option>
+                        <option value="BOOL">BOOL</option>
+                        <option value="STRING">STRING</option>
+                        <option value="REAL">REAL</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="read_write">Read/Write</label>
+                    <select id="read_write" name="read_write">
+                        <option value="">-- Select --</option>
+                        <option value="Read">Read</option>
+                        <option value="Write">Write</option>
+                        <option value="Read/Write">Read/Write</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group-main">
+                <div class="form-group">
+                    <label for="sample_mode">Sample Mode</label>
+                    <input type="text" id="sample_mode" name="sample_mode" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="sample_time">Sample Time</label>
+                    <select id="sample_time" name="sample_time">
+                        <option value="">-- Select --</option>
+                        <option value="1">1 sec</option>
+                        <option value="5">5 sec</option>
+                        <option value="10">10 sec</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group-main">
+                <div class="form-group">
+                    <label for="trigger">Trigger</label>
+                    <input type="text" id="trigger" name="trigger" autocomplete="off">
+                </div>
+                
+                <div class="form-group" id="plc-name-group" style="display: none;">
+                    <label for="plc_name">PLC Name</label>
+                    <select id="plc_name" name="plc_name">
+                        <option value="">-- Select --</option>
+                        {% for plc in plc_list %}
+                        <option value="{{ plc['Id'] }}">{{ plc['Name']}}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button type="button" class="cancel-btn" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="create-btn" id="create-btn" disabled>Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const userLoggedIn = {{ user_logged_in | tojson | safe }};
+</script>
+
+<script>
+    //Import and Export functionality
+    document.getElementById("imp-button").addEventListener("click", function () {
+        document.getElementById("excel-input").click();
+    });
+
+    document.getElementById("excel-input").addEventListener("change", function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        fetch("/devicehub/import", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("Import successful");
+                location.reload(); // or refresh your table
+            } else {
+                alert("Import failed: " + data.error);
+            }
+        })
+        .catch(err => {
+            alert("Error: " + err);
+        });
+
+        this.value = ''; // Reset input
+    });
+
+    document.getElementById("exp-button").addEventListener("click", function () {
+        window.location.href = "/devicehub/export";
+    });
+
+    const tableWrapper = document.querySelector(".inventory-table-wrapper");
+
+    function fetchTagsByPlc(plcId) {
+        fetch(`/devicehub/tags/${plcId}`)
+            .then(res => res.json())
+            .then(data => {
+                tableWrapper.innerHTML = data.html;
+            })
+            .catch(err => {
+                console.error('Failed to fetch filtered tags:', err);
+            });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const plcSelect = document.getElementById("plc-select");
+
+        if (plcSelect) {
+            plcSelect.addEventListener("change", () => {
+                const selectedPlcId = plcSelect.value;
+                fetchTagsByPlc(selectedPlcId);
+            });
+
+            // Optional: Load filtered table on initial load
+            fetchTagsByPlc(plcSelect.value);
+        }
+    });
+
+    // Modal show
+    document.getElementById('add-button').addEventListener('click', () => {
+        document.getElementById('newTagModal').style.display = 'block';
+        clearErrors();
+        validateForm();
+    });
+
+    // Close modal
+    function closeModal() {
+        document.getElementById('newTagModal').style.display = 'none';
+        document.getElementById('newTagForm').reset();
+        clearErrors();
+        document.getElementById('create-btn').disabled = true;
+    }
+
+    // Clear all error messages
+    function clearErrors() {
+        document.querySelectorAll('.error-message').forEach(el => el.remove());
+    }
+
+    // Show/hide PLC Name field when 'All Tags' is selected
+    const plcSelect = document.getElementById('plc-select');
+    const plcNameGroup = document.getElementById('plc-name-group');
+
+    function togglePlcNameField() {
+        if (plcSelect.value === 'all') {
+            plcNameGroup.style.display = 'block';
+        } else {
+            plcNameGroup.style.display = 'none';
+        }
+    }
+
+    plcSelect.addEventListener('change', togglePlcNameField);
+    togglePlcNameField();
+
+    document.querySelectorAll('#newTagForm input, #newTagForm select').forEach(input => {
+        input.addEventListener('input', validateForm);
+        input.addEventListener('blur', validateForm);
+    });
+
+    function validateForm() {
+        let valid = true;
+
+        const requiredFields = [
+            { id: 'name', message: '* required field' },
+            { id: 'category', message: '* required field' },
+            { id: 'tag_name', message: '* required field' },
+            { id: 'data_type', message: '* required field' },
+            { id: 'read_write', message: '* required field' },
+            { id: 'sample_mode', message: '* required field' },
+            { id: 'sample_time', message: '* required field' },
+            { id: 'trigger', message: '* required field' },
+        ];
+
+        clearErrors();
+
+        requiredFields.forEach(field => {
+            const el = document.getElementById(field.id);
+            if (!el.value.trim()) {
+                valid = false;
+                showError(el, field.message);
+            }
+        });
+
+        // Validate PLC Name only if plc-select is 'all'
+        const plcSelectValue = document.getElementById('plc-select').value;
+        const plcNameEl = document.getElementById('plc_name');
+
+        if (plcSelectValue === 'all') {
+            if (!plcNameEl.value.trim()) {
+                valid = false;
+                showError(plcNameEl, '* PLC Name is required.');
+            }
+        }
+
+        document.getElementById('create-btn').disabled = !valid;
+    }
+
+    function showError(element, message) {
+        const label = element.closest('.form-group').querySelector('label');
+        let error = label.querySelector('.error-message-a');
+        if (!error) {
+            error = document.createElement('small');
+            error.classList.add('error-message-a');
+            error.style.color = 'red';
+            error.style.marginLeft = '0.1rem';
+            label.appendChild(error);
+        }
+        error.textContent = message;
+    }
+
+    // Initial validation on page load
+    validateForm();
+
+    // Handle form submission using fetch
+    document.getElementById('newTagForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+
+        // Determine which PLC ID to send
+        const plcSelectValue = document.getElementById('plc-select').value;
+        let plcIdToSend;
+
+        if (plcSelectValue === 'all') {
+            plcIdToSend = document.getElementById('plc_name').value;
+            if (!plcIdToSend) {
+                alert("Please select a PLC Name.");
+                return;
+            }
+        } else {
+            plcIdToSend = plcSelectValue;
+        }
+
+        // Remove plc_name if not used
+        if (plcSelectValue !== 'all') {
+            formData.delete('plc_name');
+        }
+
+        // Append only plc_id
+        formData.append('plc_id', plcIdToSend);
+
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                document.getElementById('newTagModal').style.display = 'none';
+                document.getElementById('newTagForm').reset();
+                togglePlcNameField(); // Reset visibility of plc_name
+                fetchTagsByPlc(plcIdToSend);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => console.error("Error:", err));
+    });
+</script>
+{% endblock %}

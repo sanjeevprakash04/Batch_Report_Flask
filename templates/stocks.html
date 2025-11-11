@@ -1,35 +1,35 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="stocks-content">
-  <!-- Header with Add + Search -->
-  <div class="stocks-header">
-    <h3>Stocks</h3>
-    <div class="stocks-header-right">
-      <button class="add-btn" id="addRowBtn">Add</button>
-      <input type="text" id="searchBox" placeholder="Search...">
-    </div>
+<div class="inv-navbar">
+  <div class="inv-navbar-left">
+    <span class="inv-app-title">Stocks</span>
   </div>
 
-  <!-- Table -->
-  <div class="stocks-table-wrapper">
-    <table class="stocks-table">
-      <thead>
-        <tr>
-          <th>Silo No</th>
-          <th>Raw Material Name</th>
-          <th>Raw Material Code</th>
-          <th>Operator Name</th>
-          <th style="text-align:center;">Action</th>
-        </tr>
-      </thead>
-      <tbody id="stocksTableBody">
-        <tr>
-          <td colspan="5" class="table-error">Loading data...</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="inv-navbar-right">
+    <button class="add-btn" id="addRowBtn">Add</button>
+    <input class="search-input" type="text" id="searchBox" placeholder="Search...">
   </div>
+</div>
+
+<!-- Table -->
+<div class="stocks-table-wrapper">
+  <table class="stocks-table">
+    <thead>
+      <tr>
+        <th>Silo No</th>
+        <th>Raw Material Name</th>
+        <th>Raw Material Code</th>
+        <th>Operator Name</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="stocksTableBody">
+      <tr>
+        <td colspan="5" class="table-error">Loading data...</td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 
 <!-- JS -->

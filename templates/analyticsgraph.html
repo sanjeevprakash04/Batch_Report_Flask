@@ -1,0 +1,37 @@
+{% extends 'analytics.html' %}
+{% block analytics_graphicalview %}
+<div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem;">
+  <div class="inv-navbar-right">
+    <select id="hourSelect" class="inv-select">
+      <option value="1 Hr">1 Hr</option>
+      <option value="4 Hr">4 Hr</option>
+      <option value="8 Hr">8 Hr</option>
+      <option value="12 Hr">12 Hr</option>
+      <option value="24 Hr">24 Hr</option>
+      <option value="Custom">Custom</option>
+    </select>
+
+    <div class="date-filter">
+      <span>From:</span>
+      <input type="datetime-local" id="fromDate" class="inv-input">
+    </div>
+    <div class="date-filter">
+      <span>To:</span>
+      <input type="datetime-local" id="toDate" class="inv-input">
+    </div>
+
+    <button id="viewBtn" class="inv-button">View</button>
+    <span id="totalLabelKg" class="total-label-kg">Total Loss (in Kg): --</span>
+    <span id="totalLabelPercent" class="total-label-percent">Total Loss (in %): --</span>
+  </div>
+</div>
+
+<div class="graph-container">
+    <div class="upper">
+
+    </div>
+    <div class="lower">
+        
+    </div>
+</div>
+{% endblock %}

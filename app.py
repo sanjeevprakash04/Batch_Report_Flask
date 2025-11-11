@@ -1,10 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, abort, g, send_file, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 import pandas as pd
-from threading import Thread
+from threading import Thread, Timer
 from datetime import datetime
 import io
 import json
+import webbrowser
 
 #Modules
 from auth import authLog, authMac
@@ -12,6 +13,9 @@ from config import sqliteCon
 from modules import monitor, main, Report
 app = Flask(__name__)
 app.secret_key = '4f3d6e9a5f4b1c8d7e6a2b3c9d0e8f1a5b7c2d4e6f9a1b3c8d0e6f2a9b1d3c4'
+
+def open_browser():
+    webbrowser.open("http://127.0.0.1:5000/")
 
 # def is_activated():
 #     try:
@@ -288,10 +292,14 @@ def api_export_data():
 
 @app.route('/analytics')
 def analytics():
-    """
-    Loads the Analytics page (UI only)
-    """
-    return render_template('analytics.html')
+    return redirect(url_for('analytics_tab', tab='data'))
+
+@app.route('/analytics/<tab>')
+def analytics_tab(tab):
+    user_logged_in = 'username' in session
+    if tab == 'graph':
+        return render_template('analyticsgraph.html', tab='graph', user_logged_in=user_logged_in)
+    return render_template('analyticsdata.html', tab='data', user_logged_in=user_logged_in)
 
 @app.route('/settings')
 def settings():
@@ -514,4 +522,5 @@ def inject_user():
     return dict(user=session.get('username'), role=session.get('role'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    Timer(1, open_browser).start()
+    app.run(debug=True)
