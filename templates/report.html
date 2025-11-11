@@ -1,43 +1,250 @@
 {% extends 'base.html' %}
-
 {% block content %}
-<div class="inv-navbar">
-    <!-- Left side: menu + name -->
-    <div class="inv-navbar-left">
-        <span class="inv-app-title">Report</span>
+
+<!-- ===============================
+      REPORT HEADER
+=============================== -->
+<div class="inv-navbar report-header">
+  <div class="inv-navbar-left">
+    <span class="inv-app-title">Report</span>
+  </div>
+
+  <div class="inv-navbar-right">
+    <select id="hourSelect" class="inv-select">
+      <option value="1 Hr">1 Hr</option>
+      <option value="4 Hr">4 Hr</option>
+      <option value="8 Hr">8 Hr</option>
+      <option value="12 Hr">12 Hr</option>
+      <option value="24 Hr">24 Hr</option>
+      <option value="Custom">Custom</option>
+    </select>
+
+    <div class="date-filter">
+      <span>From:</span>
+      <input type="datetime-local" id="fromDate" class="inv-input">
     </div>
-    <div class="inv-navbar-right">
-        <select>
-            <option value="1 Hr">1 Hr</option>
-            <option value="4 Hr">4 Hr</option>
-            <option value="8 Hr">8 Hr</option>
-            <option value="12 hr">12 Hr</option>
-            <option value="24 Hr">24 Hr</option>
-            <option value="Custom">Custom</option>
-        </select>
-        <div style="display: flex; gap: 0.15rem; align-items: center;">
-            <span>From:</span>
-            <input type="date">
-        </div>
-        <div style="display: flex; gap: 0.15rem; align-items: center;">
-            <span>To:</span>
-            <input type="date">
-        </div>
-        <button class="inv-button">View</button>
-        <button class="inv-button">Export</button>
-        <span>Total Batch Weight (in Tons) - &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    <div class="date-filter">
+      <span>To:</span>
+      <input type="datetime-local" id="toDate" class="inv-input">
     </div>
-</div>
-<div class="report-content">
-    
-</div>
-<!-- Display the DataFrame table -->
-<div class="report-table-wrapper">
-    {{ table | safe }}
+
+    <button id="viewBtn" class="inv-button primary">View</button>
+    <button id="exportBtn" class="inv-button success">Export</button>
+    <span id="totalLabel" class="total-label">Total Batch Weight (in Tons): -</span>
+  </div>
 </div>
 
+<!-- ===============================
+      REPORT TABLE
+=============================== -->
+<div class="report-table-wrapper">
+  <table class="inv-table" id="reportTable">
+    <thead>
+      <tr><th>Waiting...</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Waiting for data...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===============================
+      POPUP MODAL
+=============================== -->
+<div id="popupModal" class="popup-overlay" style="display: none;">
+  <div class="popup-content">
+    <h3 id="popupTitle">PLC Data</h3>
+    <div class="popup-table-wrapper">
+      <table class="inv-table" id="popupTable">
+        <thead><tr><th>Loading...</th></tr></thead>
+        <tbody><tr><td>Loading data...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="popup-footer">
+      <button id="downloadPDF" class="inv-button primary">Download PDF</button>
+      <button id="downloadExcel" class="inv-button success">Download Excel</button>
+      <button id="closePopup" class="inv-button" style="background:#999;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===============================
+      FRONTEND SCRIPT
+=============================== -->
 <script>
-    // need script to show data tbl using an api call that need to pass  val of option and from and to  on the view btn click
+document.addEventListener("DOMContentLoaded", () => {
+
+  const hourSelect = document.getElementById("hourSelect");
+  const fromDate = document.getElementById("fromDate");
+  const toDate = document.getElementById("toDate");
+  const totalLabel = document.getElementById("totalLabel");
+  const tableHead = document.querySelector("#reportTable thead");
+  const tableBody = document.querySelector("#reportTable tbody");
+  const viewBtn = document.getElementById("viewBtn");
+  const exportBtn = document.getElementById("exportBtn");
+
+  const popup = document.getElementById("popupModal");
+  const popupTitle = document.getElementById("popupTitle");
+  const popupTableHead = document.querySelector("#popupTable thead");
+  const popupTableBody = document.querySelector("#popupTable tbody");
+  const closePopup = document.getElementById("closePopup");
+
+  // ✅ Fetch and display main report
+  viewBtn.addEventListener("click", async () => {
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    if (hours === "Custom" && (!from_time || !to_time)) {
+      alert("Please select both From and To for Custom range!");
+      return;
+    }
+
+    tableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="1" style="text-align:center;">Loading data...</td></tr>`;
+    totalLabel.textContent = "Total Batch Weight (in Tons): -";
+
+    try {
+      const res = await fetch("/api/report_data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hours, from_time, to_time })
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || "Failed to load");
+
+      const data = result.data || [];
+      if (data.length === 0) {
+        tableHead.innerHTML = `<tr><th>No Data</th></tr>`;
+        tableBody.innerHTML = `<tr><td>No data found</td></tr>`;
+        return;
+      }
+
+      const columns = Object.keys(data[0]);
+      tableHead.innerHTML = `<tr>${columns.map(col => `<th>${col}</th>`).join('')}</tr>`;
+      tableBody.innerHTML = "";
+
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = columns.map(col => `<td>${row[col] ?? ""}</td>`).join('');
+        tr.style.cursor = "pointer";
+        tr.addEventListener("click", () => openPopup(row["BatchNo"]));
+        tableBody.appendChild(tr);
+      });
+
+      totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
+
+    } catch (err) {
+      console.error("❌ Error loading report:", err);
+      tableHead.innerHTML = `<tr><th>Error</th></tr>`;
+      tableBody.innerHTML = `<tr><td>Error loading data</td></tr>`;
+    }
+  });
+
+  // ✅ Export main report as Excel
+  exportBtn.addEventListener("click", async () => {
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    if (hours === "Custom" && (!from_time || !to_time)) {
+      alert("Please select both From and To for Custom range!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/export_data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hours, from_time, to_time })
+      });
+
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Report_${hours.replace(" ", "_")}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error("❌ Export error:", err);
+      alert("Export failed — check console for details.");
+    }
+  });
+
+  // ✅ Open popup (with fixed column order)
+  async function openPopup(batchNo) {
+    popup.style.display = "flex";
+    popupTitle.textContent = `PLC Data for BatchNo: ${batchNo}`;
+    popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
+    popupTableBody.innerHTML = `<tr><td>Loading data...</td></tr>`;
+
+    try {
+      const res = await fetch("/api/plc_data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_no: batchNo })
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error || "Error fetching PLC data");
+
+      const data = result.data;
+      if (!data || data.length === 0) {
+        popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
+        popupTableBody.innerHTML = `<tr><td>No PLC Data Found</td></tr>`;
+        return;
+      }
+
+      // ✅ Fixed column order as per your desired layout
+      const cols = ["Category", "SiloNo", "MaterialName", "SetWeight", "ActualWeight", "Difference", "Tolerance"];
+
+      popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+      popupTableBody.innerHTML = data.map(row =>
+        `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join('')}</tr>`
+      ).join('');
+
+      document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
+      document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
+
+    } catch (err) {
+      popupTableHead.innerHTML = `<tr><th>Error</th></tr>`;
+      popupTableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
+    }
+  }
+
+  // ✅ Close popup
+  closePopup.addEventListener("click", () => popup.style.display = "none");
+
+  // ✅ Handle PDF & Excel download from popup
+  async function downloadReport(type, batchNo) {
+    const endpoint = type === "pdf" ? "/api/plc_data/pdf" : "/api/plc_data/excel";
+    const filename = `BatchReport_${batchNo}.${type === "pdf" ? "pdf" : "xlsx"}`;
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch_no: batchNo })
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(`❌ ${type.toUpperCase()} Download Error:`, err);
+      alert(`Failed to download ${type.toUpperCase()} report`);
+    }
+  }
+
+});
 </script>
 
 {% endblock %}

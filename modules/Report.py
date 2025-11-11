@@ -3,9 +3,13 @@ import base64
 from datetime import datetime
 import pdfkit
 import os
+import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
+# ==========================================================
+# 🔹 Utility Functions
+# ==========================================================
 def check(set_wg, act_wg, tol):
     if set_wg - tol <= act_wg <= set_wg + tol:
         return "Good"
@@ -15,9 +19,129 @@ def difference(set_wg, act_wg):
     return round(act_wg - set_wg, 2)
 
 def encode_logo(logo_path):
+    """Converts logo to Base64 string for embedding."""
     with open(logo_path, "rb") as logo_file:
         return base64.b64encode(logo_file.read()).decode('utf-8')
 
+
+# ==========================================================
+# 🔹 PDF Report Generator
+# ==========================================================
+def generate_pdf_report(df_pivot, df_string, batch_no):
+    logo_base64 = encode_logo("data_files/logo.png")
+
+    get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] if not df_string[df_string["Name"] == k].empty else "N/A"
+    
+    details = {
+        "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "plant_name": get_value("Plant Name"),
+        "recipe_name": get_value("Recipe Name"),
+        "start_time": get_value("Start Date Time"),
+        "end_time": get_value("End Date Time"),
+        "batch_no": batch_no
+    }
+
+    try:
+        st = datetime.strptime(details["start_time"], '%Y-%m-%d %H:%M:%S')
+        ed = datetime.strptime(details["end_time"], '%Y-%m-%d %H:%M:%S')
+        details["time_taken"] = str(ed - st)
+    except Exception:
+        details["time_taken"] = "N/A"
+
+    details.update({
+        "total_set_weight": df_pivot["SetWeight"].sum(),
+        "total_actual_weight": round(df_pivot["ActualWeight"].sum(), 2),
+    })
+
+    html = generate_html_report(df_pivot, logo_base64, details)
+
+    pdf_bytes = pdfkit.from_string(
+        html,
+        False,
+        configuration=pdfkit.configuration(wkhtmltopdf='data_files/wkhtmltopdf/bin/wkhtmltopdf.exe'),
+        options={
+            "enable-local-file-access": "",
+            "margin-top": "12mm",
+            "margin-bottom": "12mm",
+            "margin-left": "12mm",
+            "margin-right": "12mm",
+            "encoding": "UTF-8"
+        }
+    )
+    return pdf_bytes
+
+
+# ==========================================================
+# 🔹 Excel Report Generator
+# ==========================================================
+def generate_excel_report(df_pivot, df_string, batch_no):
+    get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] if not df_string[df_string["Name"] == k].empty else "N/A"
+    details = {
+        "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
+        "plant_name": get_value("Plant Name"),
+        "recipe_name": get_value("Recipe Name"),
+        "start_time": get_value("Start Date Time"),
+        "end_time": get_value("End Date Time"),
+        "batch_no": batch_no
+    }
+
+    output = io.BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Batch Report"
+
+    ws.append(["BATCH REPORT"])
+    ws.merge_cells("A1:F1")
+    ws["A1"].font = Font(size=14, bold=True)
+    ws["A1"].alignment = Alignment(horizontal="center")
+
+    ws.append(["Printed Date:", details["printed_date"]])
+    ws.append([])
+
+    headers = [
+        ("Plant Name", details["plant_name"]),
+        ("Recipe Name", details["recipe_name"]),
+        ("Batch No", details["batch_no"]),
+        ("Start Time", details["start_time"]),
+        ("End Time", details["end_time"]),
+        ("Total Set Weight (Kg)", df_pivot["SetWeight"].sum()),
+        ("Total Actual Weight (Kg)", round(df_pivot["ActualWeight"].sum(), 2))
+    ]
+    for i in range(0, len(headers), 2):
+        row = [headers[i][0], headers[i][1]]
+        if i + 1 < len(headers):
+            row += [headers[i+1][0], headers[i+1][1]]
+        ws.append(row)
+    ws.append([])
+
+    table_headers = ["Silo No", "Material Name", "Set Weight", "Actual Weight", "Difference", "Tolerance"]
+    ws.append(table_headers)
+
+    header_fill = PatternFill(start_color="DDDDDD", fill_type="solid")
+    for col in range(1, len(table_headers) + 1):
+        cell = ws.cell(row=ws.max_row, column=col)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+        cell.fill = header_fill
+
+    for _, row in df_pivot.iterrows():
+        ws.append([
+            row.get("SiloNo", ""),
+            row.get("MaterialName", ""),
+            row.get("SetWeight", ""),
+            row.get("ActualWeight", ""),
+            row.get("Difference", ""),
+            row.get("Tolerance", "")
+        ])
+
+    wb.save(output)
+    output.seek(0)
+    return output.read()
+
+
+# ==========================================================
+# 🔹 HTML Template for PDF (Upgraded Alignment)
+# ==========================================================
 def generate_html_report(df, logo_base64, details):
     data_rows = "".join(f'''
         <tr>
@@ -61,7 +185,6 @@ def generate_html_report(df, logo_base64, details):
         <div class="container">
             <div class="info-section">
                 <table>
-                    <tr><td><b>Plant Name:</b></td><td>{details['plant_name']}</td><td><b>Mixer Selected:</b></td><td>{details['mixer_no']}</td></tr>
                     <tr><td><b>Recipe Name:</b></td><td>{details['recipe_name']}</td><td><b>Time Taken:</b></td><td>{details['time_taken']}</td></tr>
                     <tr><td><b>Batch No:</b></td><td>{details['batch_no']}</td><td><b>Total Set Weight:</b></td><td>{details['total_set_weight']} Kg</td></tr>
                     <tr><td><b>Start Time:</b></td><td>{details['start_time']}</td><td><b>Total Actual Weight:</b></td><td>{details['total_actual_weight']} Kg</td></tr>
@@ -86,150 +209,3 @@ def generate_html_report(df, logo_base64, details):
     </html>
     '''
     return html_template
-
-def save_report_as_pdf(html_content, output_pdf_path):
-    pdfkit_config = pdfkit.configuration(wkhtmltopdf='data_files/wkhtmltopdf/bin/wkhtmltopdf.exe')
-    options = {
-        "enable-local-file-access": "",
-        "load-error-handling": "ignore"
-    }
-    pdfkit.from_string(html_content, output_pdf_path, configuration=pdfkit_config, options=options)
-    print(f"PDF report saved: {output_pdf_path}")
-
-def generate_report(company_name, df_pivot, df_string, pdf_file_path, BatchNo):
-    logo_base64 = encode_logo("data_files/logo.png")
-    get_value = lambda key: df_string.loc[df_string["Name"] == key, "Value"].iloc[0] if not df_string.loc[df_string["Name"] == key, "Value"].empty else "N/A"
-    details = {
-        "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
-        "plant_name": get_value("Plant Name"),
-        "recipe_name": get_value("Recipe Name"),
-        "start_time": get_value("Start Date Time"),
-        "end_time": get_value("End Date Time"),
-        "mixer_no": get_value("Mixer Selected")
-
-    }
-    try:
-        st_date = datetime.strptime(details["start_time"], '%Y-%m-%d %H:%M:%S')
-        ed_date = datetime.strptime(details["end_time"], '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        st_date, ed_date = datetime.now(), datetime.now()
-    details["time_taken"] = str(ed_date - st_date)
-    details.update({
-        "total_set_weight": df_pivot["SetWeight"].sum(),
-        "total_actual_weight": round(df_pivot["ActualWeight"].sum(), 2),
-        "batch_no": BatchNo
-    })
-    # df_pivot["State"] = df_pivot.apply(lambda row: check(row["SetWeight"], row["ActualWeight"], row["Tolerance"]), axis=1)
-    df_pivot["Difference"] = df_pivot.apply(lambda row: difference(row["SetWeight"], row["ActualWeight"]), axis=1) 
-    print(df_pivot)
-    html_report = generate_html_report(df_pivot, logo_base64, details)
-    save_report_as_pdf(html_report, pdf_file_path)
-
-def generate_report_xl(company_name, df_pivot, df_string, output_path, BatchNo):
-    logo_base64 = encode_logo("data_files/logo.png")
-    get_value = lambda key: df_string.loc[df_string["Name"] == key, "Value"].iloc[0] if not df_string.loc[df_string["Name"] == key, "Value"].empty else "N/A"
-    details = {
-        "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
-        "plant_name": get_value("Plant Name"),
-        "recipe_name": get_value("Recipe Name"),
-        "start_time": get_value("Start Date Time"),
-        "end_time": get_value("End Date Time"),
-        "mixer_no": get_value("Mixer Selected")
-
-    }
-    try:
-        st_date = datetime.strptime(details["start_time"], '%Y-%m-%d %H:%M:%S')
-        ed_date = datetime.strptime(details["end_time"], '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        st_date, ed_date = datetime.now(), datetime.now()
-    details["time_taken"] = str(ed_date - st_date)
-    details.update({
-        "total_set_weight": df_pivot["SetWeight"].sum(),
-        "total_actual_weight": round(df_pivot["ActualWeight"].sum(), 2),
-        "batch_no": BatchNo
-    })
-    # df_pivot["State"] = df_pivot.apply(lambda row: check(row["SetWeight"], row["ActualWeight"], row["Tolerance"]), axis=1)
-    save_report_as_excel(df_pivot, details, output_path)
-
-
-def save_report_as_excel(df, details, output_excel_path):
-    print("Generating Excel Report...")
-    
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Batch Report"
-    
-    # Title
-    ws.append(["BATCH REPORT"])
-    ws.merge_cells("A1:F1")
-    ws["A1"].font = Font(size=14, bold=True)
-    ws["A1"].alignment = Alignment(horizontal="center")
-    
-    # Printed Date
-    ws.append(["Printed Date:", details.get("printed_date", "N/A")])
-    ws.append([])  # Empty row
-    
-    # Report Details
-    headers = [
-        ("Plant Name", details.get("plant_name", "N/A")),
-        ("Mixer Selected", details.get("mixer_no", "N/A")),
-        ("Recipe Name", details.get("recipe_name", "N/A")),
-        ("Time Taken", details.get("time_taken", "N/A")),
-        ("Batch No", details.get("batch_no", "N/A")),
-        ("Start Time", details.get("start_time", "N/A")),
-        ("Total Set Weight (Kg)", details.get("total_set_weight", "N/A")),
-        ("End Time", details.get("end_time", "N/A")),
-        ("Total Actual Weight (Kg)", details.get("total_actual_weight", "N/A"))
-    ]
-    
-    # Append headers in two columns, handling odd-length lists safely
-    for i in range(0, len(headers), 2):
-        if i + 1 < len(headers):
-            ws.append([headers[i][0], headers[i][1], headers[i+1][0], headers[i+1][1]])
-        else:
-            ws.append([headers[i][0], headers[i][1], "", ""])  # Fill missing column with blanks
-    
-    ws.append([])  # Empty row before table
-    
-    # Table Header
-    table_headers = ["Silo No", "Material Name", "Set Weight (Kg)", "Actual Weight (Kg)", "Fine Weight (Kg)", "Tolerance (Kg)"]
-    ws.append(table_headers)
-    
-    # Apply styling to table headers
-    header_fill = PatternFill(start_color="DDDDDD", fill_type="solid")
-    for col in range(1, len(table_headers) + 1):
-        cell = ws.cell(row=ws.max_row, column=col)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center")
-        cell.fill = header_fill
-    
-    # Data Rows
-    for _, row in df.iterrows():
-        ws.append([
-            row.get("SiloNo", "N/A"),
-            row.get("MaterialName", "N/A"),
-            row.get("SetWeight", "N/A"),
-            row.get("ActualWeight", "N/A"),
-            row.get("FineWeight", "N/A"),
-            row.get("Tolerance", "N/A")
-        ])
-        
-        # Align all values to center
-        for col in range(1, len(table_headers) + 1):
-            ws.cell(row=ws.max_row, column=col).alignment = Alignment(horizontal="center")
-    
-    # Save to file
-    wb.save(output_excel_path)
-    print(f"Excel report saved: {output_excel_path}")
-
-
-
-
-
-
-
-
-
-
-
-

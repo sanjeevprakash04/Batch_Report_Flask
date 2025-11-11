@@ -1,39 +1,204 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="inv-navbar">
-    <!-- Left side: menu + name -->
-    <div class="inv-navbar-left">
-        <span class="inv-app-title">Stocks</span>
-    </div>
-</div>
 <div class="stocks-content">
-    <div class="left">
-        <form id="stocksForm" method="POST">
-            <div class="form-group">
-                <label for="silono">Silo No</label>
-                <input type="number" id="silono" name="silono" autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="rawmaterialname">Raw Material Name</label>
-                <input type="text" id="rawmaterialname" name="rawmaterialname" autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="rawmaterialcode">Raw Material Code</label>
-                <input type="text" id="rawmaterialcode" name="rawmaterialcode" autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="operatorname">Operator Name</label>
-                <input type="text" id="operatorname" name="operatorname" autocomplete="off">
-            </div>
-            <div class="form-button">
-                <button type="submit" class="save-btn">Save</button>
-                <button type="submit" class="export-btn">Export</button>
-            </div>
-        </form>
+  <!-- Header with Add + Search -->
+  <div class="stocks-header">
+    <h3>Stocks</h3>
+    <div class="stocks-header-right">
+      <button class="add-btn" id="addRowBtn">Add</button>
+      <input type="text" id="searchBox" placeholder="Search...">
     </div>
-    <div class="right">
+  </div>
 
-    </div>
+  <!-- Table -->
+  <div class="stocks-table-wrapper">
+    <table class="stocks-table">
+      <thead>
+        <tr>
+          <th>Silo No</th>
+          <th>Raw Material Name</th>
+          <th>Raw Material Code</th>
+          <th>Operator Name</th>
+          <th style="text-align:center;">Action</th>
+        </tr>
+      </thead>
+      <tbody id="stocksTableBody">
+        <tr>
+          <td colspan="5" class="table-error">Loading data...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
+
+<!-- JS -->
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const tableBody = document.getElementById("stocksTableBody");
+  const searchBox = document.getElementById("searchBox");
+  const addRowBtn = document.getElementById("addRowBtn");
+
+  // ✅ Load all stock records
+  async function loadStocks() {
+    try {
+      const response = await fetch("/api/stocks");
+      const data = await response.json();
+      tableBody.innerHTML = "";
+
+      if (!data.success || !data.records.length) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="table-error">No records found</td></tr>`;
+        return;
+      }
+
+      data.records.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.dataset.silono = row.SiloNo;
+
+        tr.innerHTML = `
+          <td>${row.SiloNo || "-"}</td>
+          <td>${row.MaterialName || "-"}</td>
+          <td>${row.MaterialCode || "-"}</td>
+          <td>${row.OperatorName || "-"}</td>
+          <td class="action-cell">
+            <button class="table-action-btn edit-btn" title="Edit"><i class='bx bx-edit'></i></button>
+            <button class="table-action-btn delete-btn" title="Delete"><i class='bx bx-trash'></i></button>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error("❌ Failed to load:", err);
+      tableBody.innerHTML = `<tr><td colspan="5" class="table-error">Failed to load data</td></tr>`;
+    }
+  }
+
+  // ✅ Add new row
+  addRowBtn.addEventListener("click", () => {
+    if (document.querySelector(".new-row")) return;
+
+    const tr = document.createElement("tr");
+    tr.classList.add("new-row");
+    tr.innerHTML = `
+      <td><input type="text" placeholder="Silo No" class="edit-input" /></td>
+      <td><input type="text" placeholder="Material Name" class="edit-input" /></td>
+      <td><input type="text" placeholder="Material Code" class="edit-input" /></td>
+      <td><input type="text" placeholder="Operator Name" class="edit-input" /></td>
+      <td class="action-cell">
+        <button class="table-action-btn save-new-btn" title="Save"><i class='bx bx-check'></i></button>
+        <button class="table-action-btn cancel-new-btn" title="Cancel"><i class='bx bx-x'></i></button>
+      </td>
+    `;
+    tableBody.prepend(tr);
+
+    const saveBtn = tr.querySelector(".save-new-btn");
+    const cancelBtn = tr.querySelector(".cancel-new-btn");
+
+    // ✅ Save new record
+    saveBtn.addEventListener("click", async () => {
+      const inputs = tr.querySelectorAll("input");
+      const newRecord = {
+        SiloNo: inputs[0].value.trim(),
+        MaterialName: inputs[1].value.trim(),
+        MaterialCode: inputs[2].value.trim(),
+        OperatorName: inputs[3].value.trim(),
+      };
+
+      if (!newRecord.SiloNo || !newRecord.MaterialName) {
+        alert("Please fill all required fields.");
+        return;
+      }
+
+      const res = await fetch("/api/stocks/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRecord),
+      });
+
+      const result = await res.json();
+      if (result.success) loadStocks();
+      else alert("❌ Failed to add record");
+    });
+
+    // ❌ Cancel new row
+    cancelBtn.addEventListener("click", () => tr.remove());
+  });
+
+  // ✅ Edit / Delete existing rows
+  tableBody.addEventListener("click", async (e) => {
+    const editBtn = e.target.closest(".edit-btn");
+    const deleteBtn = e.target.closest(".delete-btn");
+
+    // ✏️ Edit
+    if (editBtn) {
+      const row = editBtn.closest("tr");
+      const siloNo = row.dataset.silono;
+      if (row.classList.contains("editing")) return;
+      row.classList.add("editing");
+
+      const cells = row.querySelectorAll("td");
+      for (let i = 0; i < cells.length - 1; i++) {
+        const val = cells[i].textContent.trim();
+        cells[i].innerHTML = `<input type="text" value="${val}" class="edit-input" />`;
+      }
+
+      const actionCell = cells[cells.length - 1];
+      actionCell.innerHTML = `
+        <button class="table-action-btn save-btn" title="Save"><i class='bx bx-check'></i></button>
+        <button class="table-action-btn cancel-btn" title="Cancel"><i class='bx bx-x'></i></button>
+      `;
+
+      // ✅ Save edited record
+      actionCell.querySelector(".save-btn").addEventListener("click", async () => {
+        const inputs = row.querySelectorAll("input");
+        const updated = {
+          SiloNo: siloNo,
+          MaterialName: inputs[1].value,
+          MaterialCode: inputs[2].value,
+          OperatorName: inputs[3].value,
+        };
+
+        const res = await fetch(`/api/stocks/update/${siloNo}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updated),
+        });
+
+        const result = await res.json();
+        if (result.success) loadStocks();
+        else alert("❌ Update failed");
+      });
+
+      // ❌ Cancel edit
+      actionCell.querySelector(".cancel-btn").addEventListener("click", () => loadStocks());
+    }
+
+    // 🗑️ Delete
+    if (deleteBtn) {
+      const row = deleteBtn.closest("tr");
+      const siloNo = row.dataset.silono;
+
+      if (!confirm(`Delete record for Silo No ${siloNo}?`)) return;
+
+      const res = await fetch(`/api/stocks/delete/${siloNo}`, { method: "DELETE" });
+      const result = await res.json();
+
+      if (result.success) row.remove();
+      else alert("❌ Delete failed");
+    }
+  });
+
+  // 🔍 Search filter
+  searchBox.addEventListener("input", () => {
+    const filter = searchBox.value.toLowerCase();
+    const rows = tableBody.getElementsByTagName("tr");
+    Array.from(rows).forEach((row) => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(filter) ? "" : "none";
+    });
+  });
+
+  loadStocks();
+});
+</script>
 {% endblock %}

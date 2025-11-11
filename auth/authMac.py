@@ -4,7 +4,8 @@ from sqlalchemy import text
 import datetime
 from datetime import datetime, date, timedelta
 
-from config import postgreGetCon
+from config import sqliteCon
+
 import pandas as pd
 
 # from skewFrontendUI import Ui_MainWindow
@@ -22,8 +23,8 @@ from datetime import datetime
 def mac_insert(styEnckey):
     try:
         # Open connections        
-        conn, cursorRead, cursorWrite = postgreGetCon.get_db_connection()
-        engine, engineConRead, engineConWrite = postgreGetCon.get_db_connection_engine()
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
 
         # Read data from Info_DB
         query = text('SELECT * FROM "Info_DB"')

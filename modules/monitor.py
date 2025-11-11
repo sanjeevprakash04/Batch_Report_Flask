@@ -2,7 +2,7 @@ import pandas as pd
 import asyncio
 import logging
 from modules import main
-from config import postgreGetCon
+from config import sqliteCon
 import json
 import time
 from datetime import datetime
@@ -62,7 +62,7 @@ def trigger_connect():
     global plc_running
     try:
         print("Connecting to PLC...")
-        engine, engineConRead, engineConWrite = postgreGetCon.get_db_connection_engine()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
         dfInfo = pd.read_sql_query('SELECT * FROM "Info_DB";', engineConRead)
         dfPlcdb = pd.read_sql_query('SELECT * FROM "Data";', engineConRead)
 
@@ -70,7 +70,7 @@ def trigger_connect():
         plc = pylogix.connectABPLC(plcIP)
         status = plc.GetPLCTime()
 
-        if status.Status == 'Success':
+        if status.Status == 'Success':  
             logging.info("PLC is connected.")
             plc_running = True
             loop = asyncio.new_event_loop()
@@ -129,7 +129,7 @@ async def monitor_triggers(plc, dfPlcdb):
 
 def run_logging(plc, df_Trigger_active_tag):
     try:
-        conn, cursor = postgreGetCon.get_db_connection()
+        conn, cursor = sqliteCon.get_db_connection()
 
         df_Trigger_active_tag = df_Trigger_active_tag.reset_index(drop=True)
 
@@ -191,8 +191,8 @@ def run_logging(plc, df_Trigger_active_tag):
             conn.commit()
 
             # Optional: Call post-log actions
-            postgreGetCon.insertBatch(df_Trigger_active_tag)
-            postgreGetCon.insertMaterialExtraction(df_Trigger_active_tag, conn, cursor)
+            sqliteCon.insertBatch(df_Trigger_active_tag)
+            sqliteCon.insertMaterialExtraction(df_Trigger_active_tag, conn, cursor)
 
             df_live = df_Trigger_active_tag[['Timestamp', 'Category', 'Name', 'Data_type', 'Value']]
             logging.info(f"Data logged successfully at {timestamp}")

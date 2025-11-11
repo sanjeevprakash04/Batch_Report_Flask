@@ -2,42 +2,185 @@
 
 {% block content %}
 <div class="inv-navbar">
-    <!-- Left side: menu + name -->
+    <!-- Left side: page title -->
     <div class="inv-navbar-left">
         <span class="inv-app-title">Recipe List</span>
     </div>
+
+    <!-- Right side: import and download options -->
     <div class="inv-navbar-right">
         <div class="list-opt">
-            <button class="icon-button"><i class="bx bx-import"></i></button>
-            <button class="icon-button"><i class="bx bx-export"></i></button>
+            <button class="icon-button" title="Import"><i class="bx bx-import"></i></button>
+            <button class="icon-button" title="Export"><i class="bx bx-export"></i></button>
         </div>
         <div class="table-opt">
-            <button class="inv-button">Add</button>
-            <button class="inv-button">Save</button>
-            <button class="inv-button">Delete</button>
-            <button class="inv-button">Import</button>
-            <span>Selected Recipe - &nbsp;&nbsp;&nbsp;</span>
-            <div style="display: flex; gap: 0.15rem; align-items: center;">
+            <span>Selected Recipe -</span>
+            <div style="display: flex; gap: 0.3rem; align-items: center;">
                 <span>Mixer No:</span>
-                <input class="mix-no" type="text">
+                <input class="mix-no" type="text" />
             </div>
-            <button class="icon-button"><i class="bx bxs-download"></i></button>
+            <button class="icon-button" title="Download"><i class="bx bxs-download"></i></button>
         </div>
     </div>
 </div>
+
+<!-- Main Recipe Page Layout -->
 <div class="recipe-content">
+    <!-- Left: Tree structure for Recipes -->
     <div class="left">
-        <input type="text" placeholder="Search...">
-        <div style="display: flex; gap: 0.4rem; align-items: left; padding-left: 0.2rem;">
-            <i class='bx bx-file-blank' style="font-size: 1.3rem; cursor: pointer; color: #666;"></i>
-            <i class='bx bx-trash' style="font-size: 1.3rem; cursor: pointer; color: #666;"></i>
+        <div class="search-bar">
+            <input type="text" id="searchRecipe" placeholder="Search..." class="search-input" />
         </div>
-        <div class="folders-files">
-
+        <div class="tree-actions">
+            <i class='bx bx-file-blank add-icon' title="Add Recipe" id="addRecipe"></i>
+            <i class='bx bx-trash delete-icon' title="Delete Recipe" id="deleteRecipe"></i>
+        </div>
+        <div class="tree-view">
+            <ul id="recipeTree" class="tree-root">
+                <li class="folder-node" id="mainFolder">
+                    <i class='bx bx-folder'></i> Recipes
+                </li>
+            </ul>
         </div>
     </div>
-    <div class="right">
 
+    <!-- Right: Recipe Table (render from backend on selection) -->
+    <div class="right">
+        <div id="recipeTableContainer">
+            <p class="placeholder">Select a recipe from the left to view details.</p>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/recipe.css') }}">
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const treeRoot = document.getElementById("recipeTree");
+    const addBtn = document.getElementById("addRecipe");
+    const deleteBtn = document.getElementById("deleteRecipe");
+    const tableContainer = document.getElementById("recipeTableContainer");
+    const mainFolder = document.getElementById("mainFolder");
+
+    // ========= Load recipes from backend =========
+    async function loadRecipes() {
+        try {
+            const res = await fetch("/api/recipes");
+            const data = await res.json();
+            renderTree(data);
+        } catch (err) {
+            console.error("Error loading recipes:", err);
+        }
+    }
+
+    // ========= Render dynamic tree =========
+    function renderTree(data) {
+        // Remove previous list (if exists)
+        const existingUl = treeRoot.querySelector("ul");
+        if (existingUl) existingUl.remove();
+
+        const ul = document.createElement("ul");
+        data.forEach(cat => {
+            const catLi = document.createElement("li");
+            catLi.innerHTML = `<i class='bx bx-folder'></i> ${cat.category}`;
+            const innerUl = document.createElement("ul");
+
+            cat.recipes.forEach(r => {
+                const rLi = document.createElement("li");
+                rLi.dataset.id = r.id;
+                rLi.dataset.name = r.name;
+                rLi.dataset.category = cat.category;
+                rLi.innerHTML = `<i class='bx bx-file'></i> ${r.name}`;
+                rLi.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    selectRecipe(r);
+                });
+                innerUl.appendChild(rLi);
+            });
+
+            catLi.appendChild(innerUl);
+            catLi.addEventListener("click", (e) => {
+                e.stopPropagation();
+                catLi.classList.toggle("expanded");
+            });
+            ul.appendChild(catLi);
+        });
+
+        treeRoot.appendChild(ul);
+    }
+
+    // ========= Refresh tree on clicking folder =========
+    mainFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        loadRecipes();
+    });
+
+    // ========= Add new recipe =========
+    addBtn.addEventListener("click", async () => {
+        const newName = prompt("Enter new recipe name:");
+        if (!newName) return;
+        const res = await fetch("/api/recipes", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ name: newName })
+        });
+        if (res.ok) loadRecipes();
+    });
+
+    // ========= Delete selected recipe =========
+    deleteBtn.addEventListener("click", async () => {
+        const selected = document.querySelector(".tree-root li.active");
+        if (!selected || !selected.dataset.id) {
+            alert("Select a recipe to delete.");
+            return;
+        }
+        const confirmDel = confirm(`Delete recipe "${selected.dataset.name}"?`);
+        if (!confirmDel) return;
+        const res = await fetch(`/api/recipes/${selected.dataset.id}`, { method: "DELETE" });
+        if (res.ok) loadRecipes();
+    });
+
+    // ========= Select a recipe and load its table =========
+    async function selectRecipe(recipe) {
+        document.querySelectorAll(".tree-root li").forEach(el => el.classList.remove("active"));
+        const node = [...document.querySelectorAll(".tree-root li")].find(el => el.dataset.id == recipe.id);
+        if (node) node.classList.add("active");
+
+        try {
+            const res = await fetch(`/api/recipes/${recipe.name}/data`);
+            const data = await res.json();
+
+            if (data.length === 0) {
+                tableContainer.innerHTML = `<p class="placeholder">No data found for <b>${recipe.name}</b>.</p>`;
+                return;
+            }
+
+            const table = document.createElement("table");
+            table.classList.add("data-table");
+            const header = Object.keys(data[0]);
+            const thead = document.createElement("thead");
+            thead.innerHTML = `<tr>${header.map(h => `<th>${h}</th>`).join("")}</tr>`;
+            const tbody = document.createElement("tbody");
+            data.forEach(row => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = header.map(h => `<td>${row[h]}</td>`).join("");
+                tbody.appendChild(tr);
+            });
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            tableContainer.innerHTML = "";
+            tableContainer.appendChild(table);
+        } catch (err) {
+            console.error("Error loading recipe data:", err);
+        }
+    }
+
+    // Initial load
+    loadRecipes();
+});
+</script>
 {% endblock %}

@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="inv-navbar">
+    <div class="inv-navbar-left">
+        <span class="inv-app-title">Analytics</span>
+    </div>
+</div>
+
+<div class="analytics-wrapper">
+    <!-- === Tabs === -->
+    <div class="tab-header">
+        <button class="tab-btn active" id="dataTab">Data View</button>
+        <button class="tab-btn" id="graphTab">Graphical View</button>
+    </div>
+
+    <!-- === DATA VIEW === -->
+    <div id="dataView" class="tab-content active">
+        <div class="filter-bar">
+            <select class="inv-input">
+                <option>1 Hr</option>
+                <option>Custom</option>
+            </select>
+            <label>From:</label>
+            <input type="datetime-local" class="inv-input">
+            <label>To:</label>
+            <input type="datetime-local" class="inv-input">
+            <button class="inv-button primary" id="showDataBtn">Show Data</button>
+            <button class="inv-button success">Export Excel</button>
+            <button class="inv-button info">Analytics View</button>
+            <span class="total-loss">Total Loss (in Tons): -</span>
+        </div>
+
+        <div class="table-section">
+            <table class="inv-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>SetWeight</th>
+                        <th>ActualWeight</th>
+                        <th>Error (%)</th>
+                        <th>Error (Kg)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" style="text-align:center;">No data to display</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- === GRAPHICAL VIEW === -->
+    <div id="graphView" class="tab-content">
+        <div class="filter-bar">
+            <select class="inv-input">
+                <option>1 Hr</option>
+                <option>Custom</option>
+            </select>
+            <label>From:</label>
+            <input type="datetime-local" class="inv-input">
+            <label>To:</label>
+            <input type="datetime-local" class="inv-input">
+            <button class="inv-button primary">Show Data</button>
+            <span class="total-loss">Total Loss (Kg): - | Total Loss (%): -</span>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-block">
+                <h4>Extraction Error (Kg)</h4>
+                <canvas id="chartErrorKg"></canvas>
+            </div>
+
+            <div class="chart-block">
+                <h4>Extraction Error (%)</h4>
+                <canvas id="chartErrorPercent"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Tab Switching Logic
+    const dataTab = document.getElementById("dataTab");
+    const graphTab = document.getElementById("graphTab");
+    const dataView = document.getElementById("dataView");
+    const graphView = document.getElementById("graphView");
+
+    dataTab.addEventListener("click", () => {
+        dataTab.classList.add("active");
+        graphTab.classList.remove("active");
+        dataView.classList.add("active");
+        graphView.classList.remove("active");
+    });
+
+    graphTab.addEventListener("click", () => {
+        graphTab.classList.add("active");
+        dataTab.classList.remove("active");
+        graphView.classList.add("active");
+        dataView.classList.remove("active");
+    });
+
+    // Placeholder for "Show Data" button
+    const showDataBtn = document.getElementById("showDataBtn");
+    showDataBtn.addEventListener("click", () => {
+        alert("Data loading functionality will be added soon!");
+    });
+
+    // Chart placeholders
+    const ctx1 = document.getElementById('chartErrorKg').getContext('2d');
+    const ctx2 = document.getElementById('chartErrorPercent').getContext('2d');
+
+    new Chart(ctx1, {
+        type: 'bar',
+        data: { 
+            labels: [], 
+            datasets: [{ 
+                label: 'Error (Kg)', 
+                data: [], 
+                backgroundColor: '#1a73e8' 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            plugins: { legend: { display: false } } 
+        }
+    });
+
+    new Chart(ctx2, {
+        type: 'bar',
+        data: { 
+            labels: [], 
+            datasets: [{ 
+                label: 'Error (%)', 
+                data: [], 
+                backgroundColor: '#1a73e8' 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            plugins: { legend: { display: false } } 
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -12,7 +12,7 @@ def Modbuc_connect(PLC_IP, PLC_PORT):
     connection = client.connect()
     return connection, client
 
-def Modbus_read_register(client, address, count):
+def Modbus_read3_register(Port, address, count):
     print("Connected to Siemens PLC")
 
     # Read holding registers (for example, address 40001 -> register 0 in pymodbus)
