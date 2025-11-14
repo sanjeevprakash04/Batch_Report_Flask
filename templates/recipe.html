@@ -1,184 +1,440 @@
 {% extends 'base.html' %}
-
 {% block content %}
+
 <div class="inv-navbar recipe">
-    <!-- Left side: page title -->
-    <div class="inv-navbar-left recipe">
-        <span class="inv-app-title">Recipe List</span>
-        <div class="list-opt">
-            <button class="icon-button" title="Import"><i class="bx bx-import"></i></button>
-            <button class="icon-button" title="Export"><i class="bx bx-export"></i></button>
-        </div>
+  <div class="inv-navbar-left recipe">
+    <span class="inv-app-title">Recipe List</span>
+    <div class="list-opt">
+      <button class="icon-button" id="importBtn" title="Import"><i class="bx bx-import"></i></button>
+      <button class="icon-button" id="exportBtn" title="Export"><i class="bx bx-export"></i></button>
     </div>
+  </div>
 
-    <!-- Right side: import and download options -->
-    <div class="inv-navbar-right recipe">
-        <div class="table-opt">
-            <button class="add-btn" id="addRowBtn">Add</button>
-            <button id="importBtn" class="inv-button">Export</button>
-            <span>Selected Recipe: --</span>
-            <div style="display: flex; gap: 0.3rem; align-items: center;">
-                <span>Mixer No:</span>
-                <input class="mix-no" type="text" />
-            </div>
-            <button class="icon-button" title="Download"><i class="bx bxs-download"></i></button>
-        </div>
+  <div class="inv-navbar-right recipe">
+    <div class="table-opt">
+      <!-- Add recipe (adds a new child in the tree) -->
+      <button class="add-btn" id="addRecipe">Add</button>
+      <button id="exportBtnTop" class="inv-button">Export</button>
+      <span id="selectedRecipeLabel">Selected Recipe: --</span>
+      <div style="display:flex;gap:0.3rem;align-items:center;">
+        <span>Mixer No:</span>
+        <input class="mix-no" type="text" />
+      </div>
+      <button class="icon-button" title="Download"><i class="bx bxs-download"></i></button>
     </div>
+  </div>
 </div>
 
-<!-- Main Recipe Page Layout -->
 <div class="recipe-content">
-    <!-- Left: Tree structure for Recipes -->
-    <div class="left">
-        <div class="search-bar">
-            <input type="text" id="searchRecipe" placeholder="Search..." class="search-input" />
-        </div>
-        <div class="tree-actions">
-            <i class='bx bx-file-blank add-icon' title="Add Recipe" id="addRecipe"></i>
-            <i class='bx bx-trash delete-icon' title="Delete Recipe" id="deleteRecipe"></i>
-        </div>
-        <div class="tree-view">
-            <ul id="recipeTree" class="tree-root">
-                <li class="folder-node" id="mainFolder">
-                    <i class='bx bx-folder'></i> Recipes
-                </li>
-            </ul>
-        </div>
+  <!-- LEFT: Tree -->
+  <div class="left">
+    <div class="search-bar">
+      <input type="text" id="searchRecipe" placeholder="Search..." class="search-input" />
     </div>
 
-    <!-- Right: Recipe Table (render from backend on selection) -->
-    <div class="right">
-        <div id="recipeTableContainer">
-            <p class="placeholder">Select a recipe from the left to view details.</p>
-        </div>
+    <div class="tree-actions">
+      <button class="icon-button" id="addRecipeIcon" title="Add Recipe"><i class="bx bx-file-blank"></i></button>
+      <button class="icon-button" id="deleteRecipe" title="Delete Recipe"><i class="bx bx-trash"></i></button>
     </div>
+
+    <div class="tree-view">
+      <ul id="recipeTree" class="tree-root">
+        <li class="folder-node expanded" id="mainFolder">
+          <i class="bx bx-folder-open"></i>
+          <span>Recipes</span>
+          <ul class="child-list" id="childRecipes" role="tree"></ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+
+
+  <!-- RIGHT: Details (table) -->
+  <div class="right">
+    <div id="recipeTableContainer">
+      <p class="placeholder">Select a recipe from the left to view details.</p>
+    </div>
+  </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const treeRoot = document.getElementById("recipeTree");
-    const addBtn = document.getElementById("addRecipe");
-    const deleteBtn = document.getElementById("deleteRecipe");
-    const tableContainer = document.getElementById("recipeTableContainer");
-    const mainFolder = document.getElementById("mainFolder");
+  const childList = document.getElementById("childRecipes");
+  const addRecipeBtn = document.getElementById("addRecipe");
+  const addRecipeIcon = document.getElementById("addRecipeIcon");
+  const deleteRecipeBtn = document.getElementById("deleteRecipe");
+  const selectedLabel = document.getElementById("selectedRecipeLabel");
+  const tableContainer = document.getElementById("recipeTableContainer");
+  const searchInput = document.getElementById("searchRecipe");
 
-    // ========= Load recipes from backend =========
-    async function loadRecipes() {
-        try {
-            const res = await fetch("/api/recipes");
-            const data = await res.json();
-            renderTree(data);
-        } catch (err) {
-            console.error("Error loading recipes:", err);
-        }
+  let recipesCache = []; // holds left tree list
+
+  // ---------- Load recipes for tree ----------
+  async function loadRecipes() {
+    try {
+      const res = await fetch("/api/recipes_data/get_recipes");
+      const data = await res.json();
+      recipesCache = data || [];
+      renderTree(recipesCache);
+    } catch (err) {
+      console.error("Failed to load recipes", err);
+    }
+  }
+
+  function renderTree(data) {
+    childList.innerHTML = "";
+    if (!data || data.length === 0) {
+      childList.innerHTML = `<li class="no-data">No recipes found</li>`;
+      return;
     }
 
-    // ========= Render dynamic tree =========
-    function renderTree(data) {
-        // Remove previous list (if exists)
-        const existingUl = treeRoot.querySelector("ul");
-        if (existingUl) existingUl.remove();
-
-        const ul = document.createElement("ul");
-        data.forEach(cat => {
-            const catLi = document.createElement("li");
-            catLi.innerHTML = `<i class='bx bx-folder'></i> ${cat.category}`;
-            const innerUl = document.createElement("ul");
-
-            cat.recipes.forEach(r => {
-                const rLi = document.createElement("li");
-                rLi.dataset.id = r.id;
-                rLi.dataset.name = r.name;
-                rLi.dataset.category = cat.category;
-                rLi.innerHTML = `<i class='bx bx-file'></i> ${r.name}`;
-                rLi.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    selectRecipe(r);
-                });
-                innerUl.appendChild(rLi);
-            });
-
-            catLi.appendChild(innerUl);
-            catLi.addEventListener("click", (e) => {
-                e.stopPropagation();
-                catLi.classList.toggle("expanded");
-            });
-            ul.appendChild(catLi);
-        });
-
-        treeRoot.appendChild(ul);
-    }
-
-    // ========= Refresh tree on clicking folder =========
-    mainFolder.addEventListener("click", (e) => {
-        e.stopPropagation();
-        loadRecipes();
+    data.forEach(r => {
+      const li = document.createElement("li");
+      li.className = "file-node";
+      li.dataset.id = r.id;
+      li.dataset.name = r.name;
+      // file icon + name
+      li.innerHTML = `<i class='bx bx-file'></i><span class="recipe-name">${r.name}</span>`;
+      li.addEventListener("click", (ev) => { ev.stopPropagation(); selectRecipe(r); });
+      li.addEventListener("dblclick", (ev) => { ev.stopPropagation(); renameRecipePrompt(r); });
+      childList.appendChild(li);
     });
+  }
 
-    // ========= Add new recipe =========
-    addBtn.addEventListener("click", async () => {
-        const newName = prompt("Enter new recipe name:");
-        if (!newName) return;
-        const res = await fetch("/api/recipes", {
+  // ---------- Select recipe -> load table ----------
+  async function selectRecipe(recipe) {
+    document.querySelectorAll(".file-node").forEach(n => n.classList.remove("active"));
+    const node = document.querySelector(`.file-node[data-id='${recipe.id}']`);
+    if (node) node.classList.add("active");
+
+    selectedLabel.textContent = `Selected Recipe: ${recipe.name}`;
+
+    try {
+      const res = await fetch(`/api/recipes/${encodeURIComponent(recipe.name)}/table`);
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        tableContainer.innerHTML = `<p class="placeholder">No data found for <b>${recipe.name}</b>.</p>`;
+        return;
+      }
+      tableContainer.innerHTML = "";
+      tableContainer.appendChild(buildTable(recipe.name, data));
+    } catch (err) {
+      console.error("Failed to load table", err);
+      tableContainer.innerHTML = `<p class="placeholder">Failed to load table</p>`;
+    }
+  }
+
+  // ---------- Build table (stocks-style) ----------
+  function buildTable(category, rows) {
+    const wrapper = document.createElement("div");
+
+    // Add Row btn above table (use this to add rows to the selected recipe)
+    const addRowBtnHtml = `
+      <div style="display:flex; justify-content:flex-start; margin-bottom:8px;">
+        <button class="add-btn" id="addRowRecipe">Add Row</button>
+      </div>`;
+    wrapper.innerHTML = addRowBtnHtml;
+
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th style="width:90px">Index</th>
+          <th style="width:70px">Silo</th>
+          <th>Material</th>
+          <th style="width:120px">Set</th>
+          <th style="width:120px">Fine</th>
+          <th style="width:120px">Tolerance</th>
+          <th style="width:120px">Action</th>
+        </tr>
+      </thead>
+      <tbody id="recipeTableBody">
+        ${rows.map(r => `
+          <tr data-index="${r.Index}" data-category="${category}">
+            <td>${r.Index}</td>
+            <td>${r.SiloNo || ""}</td>
+            <td>${r.MaterialName || ""}</td>
+            <td>${r.SetWeight || ""}</td>
+            <td>${r.FineWeight || ""}</td>
+            <td>${r.Tolerance || ""}</td>
+            <td class="action-cell">
+              <button class="table-action-btn edit-btn" title="Edit"><i class='bx bx-edit'></i></button>
+              <button class="table-action-btn delete-btn" title="Delete"><i class='bx bx-trash'></i></button>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    `;
+    wrapper.appendChild(table);
+    return wrapper;
+  }
+
+  // ---------- Rename recipe (double-click) ----------
+  async function renameRecipePrompt(recipe) {
+    const newName = prompt("Rename recipe:", recipe.name);
+    if (!newName || newName.trim() === "" || newName.trim() === recipe.name) return;
+    try {
+      const res = await fetch("/api/recipes_data/rename_recipe", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ old_name: recipe.name, new_name: newName.trim() })
+      });
+      const result = await res.json();
+      if (result.success) {
+        await loadRecipes();
+        // auto-select renamed recipe
+        setTimeout(() => selectRecipe({ id: recipe.id, name: newName.trim() }), 150);
+      } else {
+        alert("Rename failed");
+      }
+    } catch (err) {
+      console.error("Rename error", err);
+      alert("Rename failed");
+    }
+  }
+
+  // ---------- Add Recipe ----------
+  async function addRecipe() {
+    const name = prompt("Enter new recipe name:");
+    if (!name || !name.trim()) return;
+    try {
+      const res = await fetch("/api/recipes_data/add_recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), category: name.trim() })
+      });
+      const result = await res.json();
+      if (result.success) {
+        await loadRecipes();
+      } else {
+        alert("Add recipe failed");
+      }
+    } catch (err) {
+      console.error("Add recipe error", err);
+      alert("Add recipe failed");
+    }
+  }
+
+  // ---------- Delete selected recipe ----------
+  async function deleteSelectedRecipe() {
+    const active = document.querySelector(".file-node.active");
+    if (!active) return alert("Select a recipe to delete.");
+    const name = active.dataset.name;
+    if (!confirm(`Delete recipe "${name}"?`)) return;
+    try {
+      const res = await fetch(`/api/recipes_data/delete_recipe/${encodeURIComponent(name)}`, { method: "DELETE" });
+      const result = await res.json();
+      if (result.success) {
+        await loadRecipes();
+        tableContainer.innerHTML = `<p class="placeholder">Recipe deleted.</p>`;
+        selectedLabel.textContent = "Selected Recipe: --";
+      } else {
+        alert("Delete failed");
+      }
+    } catch (err) {
+      console.error("Delete recipe error", err);
+      alert("Delete failed");
+    }
+  }
+
+  // ---------- Global table actions (Add Row, Edit, Delete) ----------
+  document.addEventListener("click", async (e) => {
+    // Add Row: inject a new editable row at the top of tbody
+    if (e.target.closest("#addRowRecipe")) {
+      const tbody = document.getElementById("recipeTableBody");
+      if (!tbody) return;
+      const category = selectedLabel.textContent.replace("Selected Recipe: ", "").trim();
+      const tr = document.createElement("tr");
+      tr.className = "new-row";
+      tr.innerHTML = `
+        <td>New</td>
+        <td><input class="edit-input" id="newSilo" /></td>
+        <td><input class="edit-input" id="newMaterial" disabled /></td>
+        <td><input class="edit-input" id="newSet" /></td>
+        <td><input class="edit-input" id="newFine" /></td>
+        <td><input class="edit-input" id="newTol" /></td>
+        <td class="action-cell">
+          <button class="table-action-btn save-new"><i class='bx bx-check'></i></button>
+          <button class="table-action-btn cancel-new"><i class='bx bx-x'></i></button>
+        </td>
+      `;
+      tbody.prepend(tr);
+
+      // When Silo input loses focus or on Enter, attempt lookup and fill disabled Material
+      const siloInput = tr.querySelector("#newSilo");
+      const materialInput = tr.querySelector("#newMaterial");
+
+      siloInput.addEventListener("blur", async () => {
+        const silo = siloInput.value.trim();
+        if (!silo) { materialInput.value = ""; return; }
+        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
+        const matJson = await matRes.json();
+        if (!matJson.success) {
+          materialInput.value = "";
+          alert("Invalid Silo No — Material not found!");
+        } else {
+          materialInput.value = matJson.MaterialName || "";
+        }
+      });
+
+      // Save new row
+      tr.querySelector(".save-new").onclick = async () => {
+        const silo = siloInput.value.trim();
+        const material = materialInput.value.trim();
+        const set = tr.querySelector("#newSet").value.trim();
+        const fine = tr.querySelector("#newFine").value.trim();
+        const tol = tr.querySelector("#newTol").value.trim();
+
+        if (!silo) return alert("Silo No required");
+        // check Material exists (Option A)
+        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
+        const matJson = await matRes.json();
+        if (!matJson.success) {
+          alert("Invalid Silo No — Material not found!");
+          return;
+        }
+        const payload = {
+          SiloNo: silo,
+          MaterialName: matJson.MaterialName,
+          SetWeight: set,
+          FineWeight: fine,
+          Tolerance: tol,
+          Category: category
+        };
+        try {
+          const res = await fetch("/api/recipes_data/add_row", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ name: newName })
-        });
-        if (res.ok) loadRecipes();
-    });
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (result.success) selectRecipe({ id: 0, name: category });
+          else alert("Add row failed");
+        } catch (err) { console.error(err); alert("Add row failed"); }
+      };
 
-    // ========= Delete selected recipe =========
-    deleteBtn.addEventListener("click", async () => {
-        const selected = document.querySelector(".tree-root li.active");
-        if (!selected || !selected.dataset.id) {
-            alert("Select a recipe to delete.");
-            return;
-        }
-        const confirmDel = confirm(`Delete recipe "${selected.dataset.name}"?`);
-        if (!confirmDel) return;
-        const res = await fetch(`/api/recipes/${selected.dataset.id}`, { method: "DELETE" });
-        if (res.ok) loadRecipes();
-    });
-
-    // ========= Select a recipe and load its table =========
-    async function selectRecipe(recipe) {
-        document.querySelectorAll(".tree-root li").forEach(el => el.classList.remove("active"));
-        const node = [...document.querySelectorAll(".tree-root li")].find(el => el.dataset.id == recipe.id);
-        if (node) node.classList.add("active");
-
-        try {
-            const res = await fetch(`/api/recipes/${recipe.name}/data`);
-            const data = await res.json();
-
-            if (data.length === 0) {
-                tableContainer.innerHTML = `<p class="placeholder">No data found for <b>${recipe.name}</b>.</p>`;
-                return;
-            }
-
-            const table = document.createElement("table");
-            table.classList.add("data-table");
-            const header = Object.keys(data[0]);
-            const thead = document.createElement("thead");
-            thead.innerHTML = `<tr>${header.map(h => `<th>${h}</th>`).join("")}</tr>`;
-            const tbody = document.createElement("tbody");
-            data.forEach(row => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = header.map(h => `<td>${row[h]}</td>`).join("");
-                tbody.appendChild(tr);
-            });
-            table.appendChild(thead);
-            table.appendChild(tbody);
-            tableContainer.innerHTML = "";
-            tableContainer.appendChild(table);
-        } catch (err) {
-            console.error("Error loading recipe data:", err);
-        }
+      // Cancel new row
+      tr.querySelector(".cancel-new").onclick = () => tr.remove();
     }
 
-    // Initial load
-    loadRecipes();
+    // Edit existing row
+    if (e.target.closest(".edit-btn")) {
+      const row = e.target.closest("tr");
+      if (!row || row.classList.contains("editing")) return;
+      row.classList.add("editing");
+      const tds = row.querySelectorAll("td");
+
+      // Convert cells 1..5 into inputs - for Material we will show disabled input & fetch name if Silo changes
+      const siloVal = tds[1].textContent.trim();
+      const materialVal = tds[2].textContent.trim();
+      const setVal = tds[3].textContent.trim();
+      const fineVal = tds[4].textContent.trim();
+      const tolVal = tds[5].textContent.trim();
+
+      tds[1].innerHTML = `<input class="edit-input edit-silo" value="${siloVal}" />`;
+      tds[2].innerHTML = `<input class="edit-input edit-material" value="${materialVal}" disabled />`;
+      tds[3].innerHTML = `<input class="edit-input edit-set" value="${setVal}" />`;
+      tds[4].innerHTML = `<input class="edit-input edit-fine" value="${fineVal}" />`;
+      tds[5].innerHTML = `<input class="edit-input edit-tol" value="${tolVal}" />`;
+
+      tds[6].innerHTML = `
+        <button class="table-action-btn save-edit"><i class='bx bx-check'></i></button>
+        <button class="table-action-btn cancel-edit"><i class='bx bx-x'></i></button>
+      `;
+
+      // When silo input blurred, lookup material
+      const siloInput = tds[1].querySelector(".edit-silo");
+      const matInput = tds[2].querySelector(".edit-material");
+      siloInput.addEventListener("blur", async () => {
+        const silo = siloInput.value.trim();
+        if (!silo) { matInput.value = ""; return; }
+        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
+        const matJson = await matRes.json();
+        if (!matJson.success) {
+          matInput.value = "";
+          alert("Invalid Silo No — Material not found!");
+        } else {
+          matInput.value = matJson.MaterialName || "";
+        }
+      });
+
+      // Cancel edit
+      tds[6].querySelector(".cancel-edit").onclick = () => {
+        selectRecipe({ id: row.dataset.index, name: row.dataset.category });
+      };
+
+      // Save edit
+      tds[6].querySelector(".save-edit").onclick = async () => {
+        const silo = siloInput.value.trim();
+        const matName = matInput.value.trim();
+        const setv = tds[3].querySelector(".edit-set").value.trim();
+        const finev = tds[4].querySelector(".edit-fine").value.trim();
+        const tolv = tds[5].querySelector(".edit-tol").value.trim();
+
+        if (!silo) return alert("Silo No required");
+        // validate silo exists
+        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
+        const matJson = await matRes.json();
+        if (!matJson.success) {
+          alert("Invalid Silo No — Material not found!");
+          return;
+        }
+
+        const payload = {
+          SiloNo: silo,
+          MaterialName: matJson.MaterialName,
+          SetWeight: setv,
+          FineWeight: finev,
+          Tolerance: tolv
+        };
+
+        try {
+          const res = await fetch(`/api/recipes_data/update_row/${row.dataset.index}`, {
+            method: "PUT",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (result.success) {
+            selectRecipe({ id: row.dataset.index, name: row.dataset.category });
+          } else alert("Update failed");
+        } catch (err) { console.error(err); alert("Update failed"); }
+      };
+    }
+
+    // Delete row
+    if (e.target.closest(".delete-btn")) {
+      const row = e.target.closest("tr");
+      if (!confirm("Delete this row?")) return;
+      try {
+        const res = await fetch(`/api/recipes_data/delete_row/${row.dataset.index}`, { method: "DELETE" });
+        const result = await res.json();
+        if (result.success) row.remove();
+        else alert("Delete failed");
+      } catch (err) { console.error(err); alert("Delete failed"); }
+    }
+  });
+
+  // ---------- Tree search ----------
+  searchInput.addEventListener("input", () => {
+    const q = searchInput.value.trim().toLowerCase();
+    const nodes = Array.from(document.querySelectorAll(".file-node"));
+    nodes.forEach(n => {
+      const name = n.dataset.name.toLowerCase();
+      n.style.display = name.includes(q) ? "" : "none";
+    });
+  });
+
+  // ---------- top buttons ----------
+  addRecipeBtn.addEventListener("click", addRecipe);
+  addRecipeIcon.addEventListener("click", addRecipe);
+  deleteRecipeBtn.addEventListener("click", deleteSelectedRecipe);
+
+  // initial load
+  loadRecipes();
 });
 </script>
+
 {% endblock %}

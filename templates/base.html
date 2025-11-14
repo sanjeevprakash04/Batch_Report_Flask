@@ -50,8 +50,9 @@
                     <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
                 </li>
                 <li class="{% if request.path == url_for('analytics') %}active{% endif %}">
-                    <a href="{{ url_for('analytics') }}"><i class="bx bxs-box"></i> Analytics</a>
+                    <a href="{{ url_for('analytics') }}"><i class="bx bx-bar-chart-alt-2"></i> Analytics</a>
                 </li>
+
                 <li class="{% if request.path == url_for('logs') %}active{% endif %}">
                     <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
                 </li>

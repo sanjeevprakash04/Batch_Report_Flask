@@ -417,6 +417,9 @@ body {
     opacity: 0.7;
 }
 
+/* ================================
+   📌 RECIPE PAGE LAYOUT
+================================ */
 .recipe-content {
     display: flex;
     gap: 0.3rem;
@@ -425,21 +428,25 @@ body {
     background-color: #f4f6f8;
     box-shadow: 0 0 3px rgba(0,0,0,0.5);
     height: 81.5vh;
+    box-sizing: border-box;
 }
 
-.recipe-content .left{
+/* ---------------- LEFT PANEL ---------------- */
+.recipe-content .left {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
     width: 22%;
     height: 79vh;
-    padding: 0.3rem;
+    padding: 0.4rem;
     background-color: #fff;
     border: 1px solid #ccc;
-    overflow: auto;
+    overflow-y: auto;
+    border-radius: 0.3rem;
+    box-shadow: 0 0 2px rgba(0,0,0,0.1);
 }
 
-.recipe-content .left input{
+.recipe-content .left input {
     height: 2rem;
     width: 100%;
     border-radius: 0.3rem;
@@ -448,13 +455,221 @@ body {
     border: 1px solid #aaa;
 }
 
-.recipe-content .right{
+/* ---------------- RIGHT PANEL ---------------- */
+.recipe-content .right {
     width: 78%;
     height: 79vh;
     background-color: #fff;
     border: 1px solid #ccc;
     overflow: auto;
+    padding: 0.6rem;
+    border-radius: 0.3rem;
+    box-shadow: 0 0 2px rgba(0,0,0,0.1);
 }
+
+/* ================================
+      📁 TREE VIEW (MODERN)
+================================ */
+.tree-view {
+    display: flex ;
+    flex-direction: column ;
+    font-size: 0.93rem;
+    user-select: none;
+    padding-right: 0.3rem;
+}
+
+.tree-root {
+    list-style: none;
+    padding: 0.3rem;
+    margin: 0;
+}
+
+/* Folder node */
+.folder-node {
+    font-weight: 600;
+    color: #1f2d3d;
+    cursor: pointer;
+    margin-bottom: 0.3rem;
+    align-items: center;
+    gap: 0.4rem;
+}
+.folder-node i {
+    color: #f1c40f;
+}
+
+/* Child list with dashed guideline */
+/* Child list with dashed guideline + flex column */
+.child-list {
+    list-style: none;
+    padding-left: 18px;
+    margin: 6px 0;
+    position: relative;
+
+    /* NEW: force vertical stacking & remove inline gaps */
+    display: flex;
+    flex-direction: column;
+    gap: 4px;   /* nice spacing between nodes */
+}
+
+.child-list::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 5px;
+    bottom: 5px;
+    border-left: 1px dashed #ccc;
+}
+
+/* File node */
+.file-node {
+    padding: 6px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+}
+.file-node i {
+    color: #555;
+}
+.file-node:hover {
+    background-color: #f0f6ff;
+}
+.file-node.active {
+    background-color: #dfefff;
+    border-left: 3px solid #0b65c2;
+    padding-left: 6px;
+}
+
+/* No data placeholder */
+.placeholder {
+    text-align: center;
+    margin-top: 40px;
+    color: #777;
+    font-style: italic;
+}
+
+/* ================================
+       📊 DATA TABLE (Stocks Style)
+================================ */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+/* Header */
+.data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #005da2;
+    color: #fff;
+    padding: 0.9rem 1rem;
+    font-weight: 600;
+    text-align: left;
+}
+
+/* Cells */
+.data-table th,
+.data-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+/* Striping + Hover */
+.data-table tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+.data-table tbody tr:hover {
+    background-color: #e8f1ff;
+}
+
+/* ================================
+       🛠 ACTION BUTTONS
+================================ */
+.table-action-btn {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #b5b5b5;
+    border-radius: 6px;
+    background-color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+.table-action-btn i {
+    font-size: 1.05rem;
+    color: #005da2;
+}
+.table-action-btn:hover {
+    background-color: #e8f0ff;
+    transform: scale(1.03);
+    border-color: #005da2;
+}
+
+/* Color overrides */
+.save-new i,
+.save-edit i {
+    color: #0c7a43 !important;
+}
+.cancel-new i,
+.cancel-edit i {
+    color: #d90429 !important;
+}
+.delete-btn i {
+    color: #c00 !important;
+}
+
+/* ================================
+       ✏️ EDIT INPUTS
+================================ */
+.edit-input {
+    width: 95%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+.edit-input:focus {
+    border-color: #005da2;
+    box-shadow: 0 0 3px rgba(0,93,162,0.4);
+}
+.edit-input:disabled,
+.edit-input[disabled] {
+    background: #f3f6f9;
+    color: #333;
+}
+
+/* New row highlight */
+.new-row {
+    background: #fffef6;
+}
+
+/* Scrollbars */
+.recipe-content .left::-webkit-scrollbar,
+.recipe-content .right::-webkit-scrollbar {
+    width: 8px;
+}
+.recipe-content .left::-webkit-scrollbar-thumb,
+.recipe-content .right::-webkit-scrollbar-thumb {
+    background: #bbb;
+    border-radius: 10px;
+}
+.recipe-content .left::-webkit-scrollbar-thumb:hover,
+.recipe-content .right::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .left { display:none; }
+    .right { width:100%; }
+}
+
 
 /* ==============================
    📁 SIDEBAR
@@ -603,9 +818,12 @@ body {
 ============================== */
 .analytics-content {
     background-color: #f4f6f8;
-    box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
-    padding: 0.5rem;
-    height: 87.5vh;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+    padding: 1rem 1.5rem;
+    min-height: 100vh;
+    height: auto;
+    overflow-y: auto;
+    scroll-behavior: smooth;
 }
 
 .tabs {
@@ -649,30 +867,24 @@ body {
   font-size: 0.95rem;
   margin-left: 8px;
 }
-
 .graph-container {
+    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-    width: 100%;
-    height: 74vh;
+    gap: 1rem;
 }
 
-.graph-container .upper{
-    padding: 0.5rem 1rem;
+.graph-container .upper,
+.graph-container .lower {
     width: 100%;
-    height: 37vh;
-    background-color: #eee;
-    border: 1px solid #ccc;
+    height: 400px;  /* stretch height */
 }
 
-.graph-container .lower{
-    width: 100%;
-    height: 37vh;
-    background-color: #eee;
-    border: 1px solid #ccc;
-    padding: 0.5rem 1rem;
+.graph-container canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
+
 /* ==============================
    🧾 POPUP MODAL
 ============================== */
@@ -1601,3 +1813,5 @@ tr.editing input:focus {
     border: 1px solid #ccc;
     overflow: auto;
 }
+
+

@@ -33,7 +33,7 @@
 <!-- ===============================
       ANALYTICS TABLE
 =============================== -->
-<div class="report-table-wrapper">
+<div class="table-wrapper-analytics">
   <table class="inv-table" id="reportTable">
     <thead>
       <tr><th>Waiting...</th></tr>
@@ -58,8 +58,6 @@
     </div>
 
     <div class="popup-footer">
-      <button id="downloadPDF" class="inv-button primary">Download PDF</button>
-      <button id="downloadExcel" class="inv-button success">Download Excel</button>
       <button id="closePopup" class="inv-button warning">Close</button>
     </div>
   </div>
@@ -79,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.querySelector("#reportTable tbody");
   const viewBtn = document.getElementById("viewBtn");
   const exportBtn = document.getElementById("exportBtn");
+  const analyticsBtn = document.getElementById("analyticsBtn");
 
   const popup = document.getElementById("popupModal");
   const popupTitle = document.getElementById("popupTitle");
@@ -92,50 +91,61 @@ document.addEventListener("DOMContentLoaded", () => {
     const from_time = fromDate.value;
     const to_time = toDate.value;
 
+    // Validate custom range
     if (hours === "Custom" && (!from_time || !to_time)) {
       alert("Please select both From and To for Custom range!");
       return;
     }
 
+    // Show loading state
     tableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    tableBody.innerHTML = `<tr><td colspan="1" style="text-align:center;">Loading data...</td></tr>`;
+    tableBody.innerHTML = `<tr><td style="text-align:center;">Loading data...</td></tr>`;
     totalLabel.textContent = "Total Batch Weight (in Tons): --";
 
     try {
-      const res = await fetch("/api/report_data", {
+      // Call Flask backend
+      const res = await fetch("/api/analytics_data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hours, from_time, to_time })
       });
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Failed to load");
+      if (!result.success) throw new Error(result.error || "Failed to load data");
 
       const data = result.data || [];
       if (data.length === 0) {
         tableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-        tableBody.innerHTML = `<tr><td>No data found</td></tr>`;
+        tableBody.innerHTML = `<tr><td>No records found for the selected range.</td></tr>`;
+        totalLabel.textContent = "Total Batch Weight (in Tons): 0";
         return;
       }
 
-      const columns = Object.keys(data[0]);
-      tableHead.innerHTML = `<tr>${columns.map(col => `<th>${col}</th>`).join('')}</tr>`;
+      // ✅ Fixed column order
+      const desiredColumns = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"];
+      const availableColumns = desiredColumns.filter(col => col in data[0]);
+
+      // Table headers
+      tableHead.innerHTML = `<tr>${availableColumns.map(col => `<th>${col}</th>`).join('')}</tr>`;
       tableBody.innerHTML = "";
 
+      // ✅ Populate rows with click event for popup
       data.forEach(row => {
         const tr = document.createElement("tr");
-        tr.innerHTML = columns.map(col => `<td>${row[col] ?? ""}</td>`).join('');
+        tr.innerHTML = availableColumns.map(col => `<td>${row[col] ?? ""}</td>`).join("");
         tr.style.cursor = "pointer";
-        tr.addEventListener("click", () => openPopup(row["BatchNo"]));
+        tr.addEventListener("click", () => openPopup(row["Category"], hours, from_time, to_time));
         tableBody.appendChild(tr);
       });
 
+      // ✅ Update total label
       totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
 
     } catch (err) {
-      console.error("❌ Error loading report:", err);
+      console.error("❌ Error loading analytics data:", err);
       tableHead.innerHTML = `<tr><th>Error</th></tr>`;
-      tableBody.innerHTML = `<tr><td>Error loading data</td></tr>`;
+      tableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
+      totalLabel.textContent = "Total Batch Weight (in Tons): --";
     }
   });
 
@@ -145,25 +155,35 @@ document.addEventListener("DOMContentLoaded", () => {
     const from_time = fromDate.value;
     const to_time = toDate.value;
 
+    // Validate custom range
     if (hours === "Custom" && (!from_time || !to_time)) {
       alert("Please select both From and To for Custom range!");
       return;
     }
 
     try {
-      const res = await fetch("/api/export_data", {
+      // Send request to Flask endpoint
+      const res = await fetch("/api/export_data_analytics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hours, from_time, to_time })
       });
 
       if (!res.ok) throw new Error("Export failed");
+
+      // Convert response to blob
       const blob = await res.blob();
+
+      // Create temporary URL and trigger download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Report_${hours.replace(" ", "_")}.xlsx`;
+      a.download = `Report_${hours.replace(" ", "_")}.xlsx`; // ✅ Fixed filename quotes
+      document.body.appendChild(a);
       a.click();
+
+      // Cleanup
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
     } catch (err) {
@@ -172,18 +192,47 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ✅ Open popup (with fixed column order)
-  async function openPopup(batchNo) {
+  analyticsBtn.addEventListener("click", async () => {
+      console.log("Analytics button clicked!");
+
+      try {
+          // Call Flask endpoint to start the dashboard
+          const res = await fetch("/api/analytics/dash", { method: "GET" });
+          const result = await res.json();
+
+          if (result.success) {
+              // No frontend window.open — backend handles it
+              console.log("Dashboard started successfully");
+              return;
+          } else {
+              alert("Failed to launch analytics dashboard.");
+              console.error("Server error:", result.error);
+          }
+      } catch (err) {
+          console.error("❌ Analytics launch error:", err);
+          alert("Error launching analytics dashboard. Check console for details.");
+      }
+  });
+
+
+
+  // ✅ Popup Function
+  async function openPopup(category, hours, from_time, to_time) {
     popup.style.display = "flex";
-    popupTitle.textContent = `PLC Data for BatchNo: ${batchNo}`;
+    popupTitle.textContent = `PLC Data for: ${category}`;
     popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
     popupTableBody.innerHTML = `<tr><td>Loading data...</td></tr>`;
 
     try {
-      const res = await fetch("/api/plc_data", {
+      const res = await fetch("/api/plc_data_analytics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_no: batchNo })
+        body: JSON.stringify({
+          category,
+          hours,
+          from_time,
+          to_time
+        })
       });
 
       const result = await res.json();
@@ -196,18 +245,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // ✅ Fixed column order as per your desired layout
-      const cols = ["Category", "SiloNo", "MaterialName", "SetWeight", "ActualWeight", "Difference", "Tolerance"];
+      // ✅ Fixed column order
+      const cols = [
+        "Category",
+        "SetWeight",
+        "ActualWeight",
+        "FineWeight",
+        "Error_Kg",
+        "Error_%",
+        "DiffPerc",
+        "DiffKg",
+        "TimeStamp"
+      ].filter(c => c in data[0]);
 
       popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-      popupTableBody.innerHTML = data.map(row =>
-        `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join('')}</tr>`
-      ).join('');
-
-      document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
-      document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
+      popupTableBody.innerHTML = data
+        .map(row => `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join('')}</tr>`)
+        .join('');
 
     } catch (err) {
+      console.error("❌ Popup fetch error:", err);
       popupTableHead.innerHTML = `<tr><th>Error</th></tr>`;
       popupTableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
     }
@@ -216,29 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ✅ Close popup
   closePopup.addEventListener("click", () => popup.style.display = "none");
 
-  // ✅ Handle PDF & Excel download from popup
-  async function downloadReport(type, batchNo) {
-    const endpoint = type === "pdf" ? "/api/plc_data/pdf" : "/api/plc_data/excel";
-    const filename = `BatchReport_${batchNo}.${type === "pdf" ? "pdf" : "xlsx"}`;
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_no: batchNo })
-      });
-      if (!res.ok) throw new Error("Download failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(`❌ ${type.toUpperCase()} Download Error:`, err);
-      alert(`Failed to download ${type.toUpperCase()} report`);
-    }
-  }
+  
 
 });
 </script>

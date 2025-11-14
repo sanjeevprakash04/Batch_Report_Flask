@@ -338,4 +338,63 @@ def show_data(conn, hours, from_time, to_time, engineConRead):
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
+
+
+
+def process_batch_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans and processes batch data:
+    1. Drops rows with Category == 'Info' or DataType == 'STRING'
+    2. Converts Value to numeric
+    3. Creates pivot with BatchNo + Category
+    4. Calculates Error_Kg and Error_%
+    5. Removes outliers using IQR
+    6. Groups by Category and aggregates
     
+    Returns:
+        pd.DataFrame: Grouped and aggregated results
+    """
+    # Step 1: Drop unwanted rows
+    df1 = df[~((df['Category'] == "Info") | (df['DataType'] == "STRING"))].copy()
+    
+    # Step 2: Convert Value column
+    df1["Value_num"] = pd.to_numeric(df1["Value"], errors="coerce")
+    df1.drop("Value", axis=1, inplace=True)
+    
+    # Step 3: Pivot
+    df_pivot = df1.pivot_table(
+        index=["BatchNo", "Category"], 
+        columns=["Name"], 
+        values="Value_num"
+    )
+    
+    # Step 4: Error calculations
+    df_pivot["Error_Kg"] = df_pivot["ActualWeight"] - df_pivot["SetWeight"]
+    df_pivot["Error_%"] = (df_pivot["Error_Kg"] / df_pivot["SetWeight"]) * 100
+    
+    # Step 5: IQR outlier removal
+    Q1 = df_pivot["Error_%"].quantile(0.25)
+    Q3 = df_pivot["Error_%"].quantile(0.75)
+    IQR = Q3 - Q1
+    df_clean = df_pivot[
+        (df_pivot["Error_%"] >= (Q1 - 1.5 * IQR)) &
+        (df_pivot["Error_%"] <= (Q3 + 1.5 * IQR))
+    ]
+    
+    # Step 6: Group and aggregate
+    df_group = (
+        df_clean.groupby("Category")
+        .agg({
+            "ActualWeight": "sum",
+            "SetWeight": "sum",
+            "Error_Kg": "sum",
+            "Error_%": "mean"
+        })
+        .sort_values("Error_%", ascending=False)
+        .reset_index()   # 👈 this ensures Category is kept as a column
+    )
+    # Round error columns
+    df_group["Error_Kg"] = df_group["Error_Kg"].round(2)
+    df_group["Error_%"] = df_group["Error_%"].round(2)
+    
+    return df_group

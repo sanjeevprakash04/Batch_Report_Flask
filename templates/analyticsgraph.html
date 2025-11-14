@@ -20,18 +20,133 @@
       <input type="datetime-local" id="toDate" class="inv-input">
     </div>
 
-    <button id="viewBtn" class="inv-button">View</button>
+    <button id="viewBtnGraph" class="inv-button">View</button>
     <span id="totalLabelKg" class="total-label-kg">Total Loss (in Kg): --</span>
     <span id="totalLabelPercent" class="total-label-percent">Total Loss (in %): --</span>
   </div>
 </div>
 
 <div class="graph-container">
-    <div class="upper">
-
-    </div>
-    <div class="lower">
-        
-    </div>
+  <div class="upper" id="graphKg"></div>
+  <div class="lower" id="graphPer"></div>
 </div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  /** ☑️ FORCE PURE WHITE BACKGROUND FOR ALL CHARTS **/
+  Chart.register({
+    id: "whiteBackground",
+    beforeDraw: (chart) => {
+      const ctx = chart.canvas.getContext("2d");
+      ctx.save();
+      ctx.fillStyle = "#ffffff";  // PURE WHITE
+      ctx.fillRect(0, 0, chart.width, chart.height);
+      ctx.restore();
+    }
+  });
+
+  const hourSelect = document.getElementById("hourSelect");
+  const fromDate = document.getElementById("fromDate");
+  const toDate = document.getElementById("toDate");
+  const viewBtn = document.getElementById("viewBtnGraph");
+  const totalKg = document.getElementById("totalLabelKg");
+  const totalPer = document.getElementById("totalLabelPercent");
+
+  const ctxKg = document.createElement("canvas");
+  const ctxPer = document.createElement("canvas");
+  document.getElementById("graphKg").appendChild(ctxKg);
+  document.getElementById("graphPer").appendChild(ctxPer);
+
+  let chartKg, chartPer;
+
+  viewBtn.addEventListener("click", async () => {
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    const res = await fetch("/api/analytics/graph/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
+
+    const result = await res.json();
+    if (result.error) {
+      alert(result.error);
+      return;
+    }
+
+    const data = result.data;
+    if (!data || data.length === 0) {
+      alert("No data found for this range");
+      return;
+    }
+
+    const categories = data.map(d => d["Category"]);
+    const errorKg = data.map(d => d["Error_Kg"]);
+    const errorPer = data.map(d => d["Error_%"]);
+
+    if (chartKg) chartKg.destroy();
+    if (chartPer) chartPer.destroy();
+
+    // ====================== BLUE KG CHART ======================
+    chartKg = new Chart(ctxKg, {
+      type: "bar",
+      data: {
+        labels: categories,
+        datasets: [{
+          label: "Error (Kg)",
+          data: errorKg,
+          backgroundColor: "#2196F3"
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "Total Error (Kg) per Silo", color: "#000" },
+          legend: { display: false }
+        },
+        scales: {
+          x: { title: { display: true, text: "Category" } },
+          y: { title: { display: true, text: "Error (Kg)" } }
+        }
+      }
+    });
+
+    // ====================== BLUE % CHART ======================
+    chartPer = new Chart(ctxPer, {
+      type: "bar",
+      data: {
+        labels: categories,
+        datasets: [{
+          label: "Error (%)",
+          data: errorPer,
+          backgroundColor: "#2196F3"
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "Total Error (%) per Silo", color: "#000" },
+          legend: { display: false }
+        },
+        scales: {
+          x: { title: { display: true, text: "Category" } },
+          y: { title: { display: true, text: "Error (%)" } }
+        }
+      }
+    });
+
+    totalKg.textContent = `Total Loss (in Kg): ${result.total_error_kg}`;
+    totalPer.textContent = `Total Loss (in %): ${result.total_error_per}`;
+  });
+});
+</script>
+
 {% endblock %}

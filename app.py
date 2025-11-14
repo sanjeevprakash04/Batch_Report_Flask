@@ -6,11 +6,13 @@ from datetime import datetime
 import io
 import json
 import webbrowser
+import threading
+import plotly
 
 #Modules
 from auth import authLog, authMac
 from config import sqliteCon
-from modules import monitor, main, Report
+from modules import monitor, main, Report, analytics_module, graphs
 app = Flask(__name__)
 app.secret_key = '4f3d6e9a5f4b1c8d7e6a2b3c9d0e8f1a5b7c2d4e6f9a1b3c8d0e6f2a9b1d3c4'
 
@@ -64,44 +66,44 @@ def dashboard():
 def logs():
     return render_template('logs.html')
 
+
 @app.route('/recipe')
 def recipe():
     return render_template('recipe.html')
 
-# ---- Get all recipes (tree view) ----
-@app.route("/api/recipes", methods=["GET"])
+@app.route("/api/material/<silo_no>", methods=["GET"])
+def get_material_by_silo(silo_no):
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+    cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo = ?", (silo_no,))
+    row = cursorRead.fetchone()
+    conn.close()
+    if row:
+        return jsonify({"success": True, "MaterialName": row[0]})
+    else:
+        return jsonify({"success": False}), 404
+
+@app.route("/api/recipes_data/get_recipes", methods=["GET"])
 def get_recipes():
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-    cursorRead.execute("SELECT DISTINCT category FROM recipes")
-    categories = cursorRead.fetchall()
-    
-    tree_data = []
-    for (category,) in categories:
-        cursorRead.execute("SELECT name FROM recipes WHERE category=?", (category,))
-        recipes = [r[0] for r in cursorRead.fetchall()]
-        print("Category:", category, "Recipes:", recipes)
-        tree_data.append({"category": category, "recipes": recipes})
-    
+    cursorRead.execute("SELECT id, name FROM recipes ORDER BY id ASC")
+    data = [{"id": row[0], "name": row[1]} for row in cursorRead.fetchall()]
     conn.close()
-    return jsonify(tree_data)
+    return jsonify(data)
 
-
-# ---- Add a new recipe ----
-@app.route("/api/recipes", methods=["POST"])
+@app.route("/api/recipes_data/add_recipe", methods=["POST"])
 def add_recipe():
     data = request.json
     name = data.get("name")
-    category = data.get("category", "Recipes")  # Default parent category
-    
+    category = data.get("category", name)
+    if not name:
+        return jsonify({"success": False, "error": "name required"}), 400
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
     cursorWrite.execute("INSERT INTO recipes (name, category) VALUES (?, ?)", (name, category))
     conn.commit()
     conn.close()
     return jsonify({"success": True})
 
-
-# ---- Delete a recipe ----
-@app.route("/api/recipes/<string:name>", methods=["DELETE"])
+@app.route("/api/recipes_data/delete_recipe/<string:name>", methods=["DELETE"])
 def delete_recipe(name):
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
     cursorWrite.execute("DELETE FROM recipes WHERE name=?", (name,))
@@ -109,15 +111,27 @@ def delete_recipe(name):
     conn.close()
     return jsonify({"success": True})
 
-
-# ---- Load recipe data table ----
-@app.route("/api/recipes/<string:category>/data", methods=["GET"])
-def get_recipe_data(category):
+@app.route("/api/recipes_data/rename_recipe", methods=["PUT"])
+def rename_recipe():
+    data = request.json
+    old = data.get("old_name")
+    new = data.get("new_name")
+    if not old or not new:
+        return jsonify({"success": False, "error": "old_name and new_name required"}), 400
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+    cursorWrite.execute("UPDATE recipes SET name=? WHERE name=?", (new, old))
+    cursorWrite.execute("UPDATE recipeData SET Category=? WHERE Category=?", (new, old))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
-    # Query same as displaytable() logic
+@app.route("/api/recipes/<string:category>/table", methods=["GET"])
+def get_recipe_table(category):
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
     query = """
-        SELECT r."Index", r.SiloNo, m.MaterialName, r.SetWeight, r.FineWeight, r.Tolerance
+        SELECT r."Index", r.SiloNo,
+               COALESCE(m.MaterialName, r.MaterialName) AS MaterialName,
+               r.SetWeight, r.FineWeight, r.Tolerance
         FROM recipeData r
         LEFT JOIN MaterialData m ON r.SiloNo = m.SiloNo
         WHERE r.Category = ?
@@ -125,10 +139,62 @@ def get_recipe_data(category):
     """
     cursorRead.execute(query, (category,))
     data = cursorRead.fetchall()
-    columns = [desc[0] for desc in cursorRead.description]
-
+    cols = [desc[0] for desc in cursorRead.description]
     conn.close()
-    return jsonify([dict(zip(columns, row)) for row in data])
+    return jsonify([dict(zip(cols, row)) for row in data])
+
+@app.route("/api/recipes_data/add_row", methods=["POST"])
+def add_row():
+    data = request.json
+    silo = data.get("SiloNo")
+    # ensure material exists (Option A)
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+    cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo=?", (silo,))
+    mrow = cursorRead.fetchone()
+    if not mrow:
+        conn.close()
+        return jsonify({"success": False, "error": "silo_not_found"}), 400
+    material_name = mrow[0]
+    cursorWrite.execute("""
+        INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        silo, material_name,
+        data.get("SetWeight"), data.get("FineWeight"),
+        data.get("Tolerance"), data.get("Category")
+    ))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+@app.route("/api/recipes_data/update_row/<int:index>", methods=["PUT"])
+def update_row(index):
+    data = request.json
+    silo = data.get("SiloNo")
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+    cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo=?", (silo,))
+    mrow = cursorRead.fetchone()
+    if not mrow:
+        conn.close()
+        return jsonify({"success": False, "error": "silo_not_found"}), 400
+    material_name = mrow[0]
+    cursorWrite.execute("""
+        UPDATE recipeData
+        SET SiloNo=?, MaterialName=?, SetWeight=?, FineWeight=?, Tolerance=?
+        WHERE "Index"=?
+    """, (silo, material_name, data.get("SetWeight"), data.get("FineWeight"), data.get("Tolerance"), index))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+@app.route("/api/recipes_data/delete_row/<int:index>", methods=["DELETE"])
+def delete_row(index):
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+    cursorWrite.execute('DELETE FROM recipeData WHERE "Index"=?', (index,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
 @app.route('/report')
 def report():
     return render_template('report.html')
@@ -293,6 +359,238 @@ def api_export_data():
 @app.route('/analytics')
 def analytics():
     return redirect(url_for('analytics_tab', tab='data'))
+
+@app.route("/api/analytics_data", methods=["POST"])
+def analytics_data():
+    """
+    Expects JSON: { "hours": "1 Hr" | "4 Hr" | ... | "Custom",
+                   "from_time": "2025-11-01T10:00" (ISOLocal) optional,
+                   "to_time": "2025-11-01T12:00" (ISOLocal) optional }
+    Returns:
+      {
+        "success": True,
+        "data": [ {Category:..., SetWeight:..., ActualWeight:..., Error_%:..., Error_Kg:...}, ... ],
+        "total_weight": <float>  # total Error_Kg sum / 1000 (rounded)
+      }
+    """
+    try:
+        payload = request.get_json() or {}
+        hours = payload.get("hours", "1 Hr")
+        from_time = payload.get("from_time")
+        to_time = payload.get("to_time")
+        print(f"📥 Analytics Filters → Hours: {hours}, From: {from_time}, To: {to_time}")
+        # Basic validation for Custom range
+        if hours == "Custom":
+            if not from_time or not to_time:
+                return jsonify({"success": False, "error": "Custom range requires from_time and to_time"}), 400
+            # optional: validate ISO format
+            try:
+                # This only validates format; your show_data handles DB queries
+                datetime.fromisoformat(from_time)
+                datetime.fromisoformat(to_time)
+            except Exception:
+                return jsonify({"success": False, "error": "Invalid from_time/to_time format, use ISO format"}), 400
+
+        # Get DB connections (uses your existing helper)
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        # Use your existing show_data to fetch raw rows
+        df = sqliteCon.show_data(conn, hours, from_time, to_time, engineConRead)
+
+        if df is None or df.empty:
+            return jsonify({"success": True, "data": [], "total_weight": 0.0})
+
+        # Use your existing processing function
+        df_diff = sqliteCon.process_batch_data(df)
+        if df_diff is None or df_diff.empty:
+            return jsonify({"success": True, "data": [], "total_weight": 0.0})
+
+        # Keep only the columns your frontend expects (if present)
+        column_order = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"]
+        existing_columns = [c for c in column_order if c in df_diff.columns]
+        df_diff = df_diff[existing_columns]
+
+        # Calculate total (sum Error_Kg -> convert to tons by dividing 1000)
+        total_error_kg = df_diff["Error_Kg"].sum() if "Error_Kg" in df_diff.columns else 0
+        total_tons = round(total_error_kg / 1000.0, 2)
+
+        # Convert to JSON-serializable structure
+        data = df_diff.fillna("").to_dict(orient="records")
+
+        return jsonify({"success": True, "data": data, "total_weight": total_tons})
+
+    except Exception as e:
+        # keep message minimal for production; full error helps during development
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route("/api/export_data_analytics", methods=["POST"])
+def export_data_analytics():
+    """
+    Exports processed analytics data as an Excel file.
+    Expects JSON body: { "hours": "1 Hr", "from_time": "...", "to_time": "..." }
+    """
+    try:
+        payload = request.get_json() or {}
+        hours = payload.get("hours", "1 Hr")
+        from_time = payload.get("from_time")
+        to_time = payload.get("to_time")
+
+        # Validation for custom range
+        if hours == "Custom" and (not from_time or not to_time):
+            return jsonify({"success": False, "error": "Missing from/to times"}), 400
+
+        # DB Connection
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        # Fetch raw data
+        df = sqliteCon.show_data(conn, hours, from_time, to_time, engineConRead)
+        if df is None or df.empty:
+            return jsonify({"success": False, "error": "No data available for export"}), 404
+
+        # Process
+        df_diff = sqliteCon.process_batch_data(df)
+        if df_diff is None or df_diff.empty:
+            return jsonify({"success": False, "error": "No processed data to export"}), 404
+
+        # Reorder columns
+        column_order = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"]
+        existing_columns = [col for col in column_order if col in df_diff.columns]
+        df_diff = df_diff[existing_columns]
+
+        # Convert to Excel in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df_diff.to_excel(writer, index=False, sheet_name="Analytics_Report")
+            worksheet = writer.sheets["Analytics_Report"]
+            # Optional: auto adjust column widths
+            for i, col in enumerate(df_diff.columns):
+                max_len = max(df_diff[col].astype(str).map(len).max(), len(col))
+                worksheet.set_column(i, i, max_len + 3)
+
+        output.seek(0)
+
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Analytics_Report_{timestamp}.xlsx"
+
+        # Send as file download
+        return send_file(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        print(f"❌ Export error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route("/api/plc_data_analytics", methods=["POST"])
+def plc_data_analytics():
+    try:
+        data = request.get_json() or {}
+
+        # ✅ Extract parameters safely
+        category = data.get("category")  # Category or Silo
+        hours = data.get("hours", "1 Hr")
+        from_time = data.get("from_time")
+        to_time = data.get("to_time")
+
+        # ✅ Validation
+        if not category:
+            return jsonify({"success": False, "error": "Missing 'category' field"}), 400
+
+        # ✅ Get DB connections
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        # ✅ Fetch main PLC data
+        df = sqliteCon.show_data(conn, hours, from_time, to_time, engineConRead)
+        if df is None or df.empty:
+            return jsonify({"success": False, "error": "No PLC data found for the selected range"}), 404
+
+        # ✅ Filter and transform data
+        df = df[df["Category"] != "Info"]
+        df_pivot = sqliteCon.get_silo_pivot(df, category)
+        if df_pivot is None or df_pivot.empty:
+            return jsonify({"success": True, "data": []})
+
+        # ✅ Fixed column order
+        col_order = [
+            "Category", "SetWeight", "ActualWeight", "FineWeight",
+            "Error_Kg", "Error_%", "DiffPerc", "DiffKg", "TimeStamp"
+        ]
+        existing_cols = [c for c in col_order if c in df_pivot.columns]
+        df_pivot = df_pivot[existing_cols]
+
+        # ✅ Send cleaned response
+        return jsonify({
+            "success": True,
+            "data": df_pivot.fillna("").to_dict(orient="records")
+        })
+
+    except Exception as e:
+        print(f"❌ Error in /api/plc_data_analytics: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/analytics/dash", methods=["GET"])
+def analytics_dashboard():
+    try:
+        print("🚀 Starting Dashboard...")
+
+        # Start Dash in a NON-daemon thread
+        thread = threading.Thread(target=analytics_module.run_dashboard)
+        thread.daemon = False
+        thread.start()
+
+        # Open dashboard automatically in browser
+        webbrowser.open("http://127.0.0.1:8050", new=2)
+
+        # Return success to frontend
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print("❌ Dashboard failed:", e)
+        return jsonify({"success": False, "error": str(e)})
+
+    
+@app.route('/api/analytics/graph/data', methods=['GET', 'POST'])
+def get_analytics_graph_data():
+    try:
+        print("✅ Flask route reached /api/analytics/graph/data")
+        # Safe JSON extraction
+        data = request.get_json(force=True, silent=True) or {}
+        print("📥 Incoming JSON:", data)
+
+        hours = data.get("hours", "1 Hr")
+        from_time = data.get("from_time")
+        to_time = data.get("to_time")
+
+        print(f"📥 Received parameters → Hours: {hours}, From: {from_time}, To: {to_time}")
+
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        df = sqliteCon.show_data(conn, hours, from_time, to_time, engineConRead)
+        df_diff = sqliteCon.process_batch_data(df)
+
+        if df_diff is None or df_diff.empty:
+            return jsonify({"error": "No data found"})
+
+        total_error_kg = round(df_diff["Error_Kg"].sum(), 2)
+        total_error_per = round(df_diff["Error_%"].mean(), 2)
+
+        return jsonify({
+            "data": df_diff.to_dict(orient="records"),
+            "total_error_kg": total_error_kg,
+            "total_error_per": total_error_per
+        })
+    except Exception as e:
+        print("❌ Graph API error:", e)
+        return jsonify({"error": str(e)})
+
 
 @app.route('/analytics/<tab>')
 def analytics_tab(tab):
@@ -522,5 +820,5 @@ def inject_user():
     return dict(user=session.get('username'), role=session.get('role'))
 
 if __name__ == '__main__':
-    Timer(1, open_browser).start()
+    # Timer(1, open_browser).start()
     app.run(debug=True)
