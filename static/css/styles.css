@@ -435,7 +435,7 @@ body {
 .recipe-content .left {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.1rem;
     width: 22%;
     height: 79vh;
     padding: 0.4rem;
@@ -501,44 +501,37 @@ body {
 /* Child list with dashed guideline + flex column */
 .child-list {
     list-style: none;
-    padding-left: 18px;
-    margin: 6px 0;
+    margin: 0;
+    padding-left: 1rem;
     position: relative;
-
     /* NEW: force vertical stacking & remove inline gaps */
     display: flex;
     flex-direction: column;
-    gap: 4px;   /* nice spacing between nodes */
 }
 
 .child-list::before {
     content: "";
     position: absolute;
-    left: 6px;
-    top: 5px;
-    bottom: 5px;
+    left: 0.4rem;
+    top: 0;
+    bottom: 0;
     border-left: 1px dashed #ccc;
 }
 
 /* File node */
 .file-node {
-    padding: 6px 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
-    border-radius: 4px;
+    border-radius: 0.1rem;
+    font-size: 0.95rem;
+    padding: 0.3rem 0.5rem;
 }
 .file-node i {
     color: #555;
 }
 .file-node:hover {
     background-color: #f0f6ff;
-}
-.file-node.active {
-    background-color: #dfefff;
-    border-left: 3px solid #0b65c2;
-    padding-left: 6px;
 }
 
 /* No data placeholder */
@@ -820,7 +813,7 @@ body {
     background-color: #f4f6f8;
     box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
     padding: 1rem 1.5rem;
-    min-height: 100vh;
+    min-height: 87.5vh;
     height: auto;
     overflow-y: auto;
     scroll-behavior: smooth;
@@ -1814,4 +1807,131 @@ tr.editing input:focus {
     overflow: auto;
 }
 
+/* Inventory Table Styling */
+.inventory-table-wrapper {
+    background-color: #f4f6f8;
+    overflow-x: auto;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
+}
 
+.inventory-table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    /* color: #fff; */
+    font-size: 0.9rem;
+    /* margin-top: 0.5rem; */
+    border: 1px solid #ddd;
+}
+
+.inventory-table-wrapper th,
+.inventory-table-wrapper td {
+    border: none;
+    padding: 0.75rem 1.2rem;
+    text-align: left;
+}
+
+.inventory-table-wrapper thead {
+    background-color: #f4f6f8;
+}
+
+.inventory-table-wrapper th {
+    font-weight: bold;
+    background-color: #005da2;
+    color: white;
+}
+
+.inventory-table-wrapper tbody tr:nth-child(even) {
+    background-color: #eee;
+}
+
+.inventory-table-wrapper tbody tr:nth-child(odd) {
+    background-color: #fff;
+}
+
+.inventory-table-wrapper i.bx {
+    color: #005da2;
+    transition: color 0.3s ease;
+}
+
+.new-row {
+    background-color: #f9f9f9;
+    border-top: 2px dashed #ccc;
+}
+
+/* .inventory-table-wrapper i.bx:hover {
+    color: #007bff;
+} */
+
+.inventory-table-wrapper select {
+    padding: 0.3rem 1.5rem 0.3rem 0.3rem;
+    border-radius: 0.3rem;
+    border: 1px solid #ccc;
+    font-size: 0.9rem;
+    background-color: #fff;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.inventory-table-wrapper select:focus {
+    border-color: #005da2;
+    box-shadow: 0 0 3px rgba(0, 93, 162, 0.5);
+}
+
+.inventory-table-wrapper input[type="text"] {
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.3rem;
+    border: 1px solid #ccc;
+    font-size: 0.9rem;
+    background-color: #fff;
+    outline: none;
+    width: 50%;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.inventory-table-wrapper input[type="text"]:focus {
+    border-color: #005da2;
+    box-shadow: 0 0 3px rgba(0, 93, 162, 0.5);
+}
+
+.row-checkbox {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+    accent-color: #005da2;
+}
+
+th {
+    position: relative;
+    padding-right: 0.5rem; /* space for arrow */
+}
+
+/* .header-label {
+    display: inline-block;
+} */
+
+.sort-arrow {
+    position: absolute;
+    left: 0.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8rem;
+    color: white;
+    pointer-events: none;
+}
+
+/* .inventory-table-wrapper tbody tr:hover {
+    background-color: #ddd;
+    transition: background-color 0.3s ease;
+} */
+
+/* Animations */
+@keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}
+
+@keyframes slideUp {
+    from {transform: translateY(40px); opacity: 0;}
+    to {transform: translateY(0); opacity: 1;}
+}

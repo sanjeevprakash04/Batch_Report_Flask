@@ -15,9 +15,12 @@
       <!-- Add recipe (adds a new child in the tree) -->
       <button class="add-btn" id="addRecipe">Add</button>
       <button id="exportBtnTop" class="inv-button">Export</button>
-      <span id="selectedRecipeLabel">Selected Recipe: --</span>
+      <div style="display: flex; gap:0.2rem; align-items:center;">
+        <span style="font-weight: 600;">Selected Recipe:</span>
+        <span id="selectedRecipeLabel" style="background-color: #fff; border: 1px solid #aaa; padding: 0.3rem 0.5rem; border-radius: 0.2rem;">--</span>
+      </div>
       <div style="display:flex;gap:0.3rem;align-items:center;">
-        <span>Mixer No:</span>
+        <span style="font-weight: 600;">Mixer No:</span>
         <input class="mix-no" type="text" />
       </div>
       <button class="icon-button" title="Download"><i class="bx bxs-download"></i></button>
@@ -33,22 +36,20 @@
     </div>
 
     <div class="tree-actions">
-      <button class="icon-button" id="addRecipeIcon" title="Add Recipe"><i class="bx bx-file-blank"></i></button>
-      <button class="icon-button" id="deleteRecipe" title="Delete Recipe"><i class="bx bx-trash"></i></button>
+      <i class='bx bx-file-blank add-icon' title="Add Recipe" id="addRecipeIcon"></i>
+      <i class='bx bx-trash delete-icon' title="Delete Recipe" id="deleteRecipe"></i>
     </div>
 
     <div class="tree-view">
-      <ul id="recipeTree" class="tree-root">
-        <li class="folder-node expanded" id="mainFolder">
+      <ul class="tree-root">
+        <li class="folder-node expanded">
           <i class="bx bx-folder-open"></i>
           <span>Recipes</span>
-          <ul class="child-list" id="childRecipes" role="tree"></ul>
         </li>
+        <ul class="child-list" id="childRecipes" role="tree"></ul>
       </ul>
     </div>
   </div>
-
-
 
   <!-- RIGHT: Details (table) -->
   <div class="right">
@@ -108,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const node = document.querySelector(`.file-node[data-id='${recipe.id}']`);
     if (node) node.classList.add("active");
 
-    selectedLabel.textContent = `Selected Recipe: ${recipe.name}`;
+    selectedLabel.textContent = `${recipe.name}`;
 
     try {
       const res = await fetch(`/api/recipes/${encodeURIComponent(recipe.name)}/table`);
@@ -229,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (result.success) {
         await loadRecipes();
         tableContainer.innerHTML = `<p class="placeholder">Recipe deleted.</p>`;
-        selectedLabel.textContent = "Selected Recipe: --";
+        selectedLabel.textContent = "--";
       } else {
         alert("Delete failed");
       }
@@ -245,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.closest("#addRowRecipe")) {
       const tbody = document.getElementById("recipeTableBody");
       if (!tbody) return;
-      const category = selectedLabel.textContent.replace("Selected Recipe: ", "").trim();
+      const category = selectedLabel.textContent.replace("--", "").trim();
       const tr = document.createElement("tr");
       tr.className = "new-row";
       tr.innerHTML = `
