@@ -12,27 +12,30 @@
 
   <div class="inv-navbar-right recipe">
     <div class="table-opt">
-      <!-- Add recipe (adds a new child in the tree) -->
-      <button class="add-btn" id="addRecipe">Add</button>
-      <button id="exportBtnTop" class="inv-button">Export</button>
-      <div style="display: flex; gap:0.2rem; align-items:center;">
-        <span style="font-weight: 600;">Selected Recipe:</span>
-        <span id="selectedRecipeLabel" style="background-color: #fff; border: 1px solid #aaa; padding: 0.3rem 0.5rem; border-radius: 0.2rem;">--</span>
+
+      <!-- ADD ROW (This is now the ONLY Add Row button) -->
+      <button class="add-btn" id="addRowRecipe">Add</button>
+
+      <div style="display:flex;gap:0.2rem;align-items:center;">
+        <span style="font-weight:600;">Selected Recipe:</span>
+        <span id="selectedRecipeLabel"
+          style="background:#fff;border:1px solid #aaa;padding:0.3rem 0.5rem;border-radius:0.2rem;">--</span>
       </div>
-      <div style="display:flex;gap:0.3rem;align-items:center;">
-        <span style="font-weight: 600;">Mixer No:</span>
-        <input class="mix-no" type="text" />
-      </div>
+
+
       <button class="icon-button" title="Download"><i class="bx bxs-download"></i></button>
     </div>
   </div>
 </div>
 
+
 <div class="recipe-content">
-  <!-- LEFT: Tree -->
+
+  <!---------------- LEFT TREE PANEL ---------------->
   <div class="left">
+
     <div class="search-bar">
-      <input type="text" id="searchRecipe" placeholder="Search..." class="search-input" />
+      <input type="text" id="searchRecipe" placeholder="Search…" class="search-input">
     </div>
 
     <div class="tree-actions">
@@ -42,50 +45,57 @@
 
     <div class="tree-view">
       <ul class="tree-root">
+
         <li class="folder-node expanded">
           <i class="bx bx-folder-open"></i>
           <span>Recipes</span>
         </li>
+
         <ul class="child-list" id="childRecipes" role="tree"></ul>
+
       </ul>
     </div>
+
   </div>
 
-  <!-- RIGHT: Details (table) -->
+
+
+  <!---------------- RIGHT TABLE PANEL ---------------->
   <div class="right">
     <div id="recipeTableContainer">
       <p class="placeholder">Select a recipe from the left to view details.</p>
     </div>
   </div>
+
 </div>
+
+
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+
   const childList = document.getElementById("childRecipes");
-  const addRecipeBtn = document.getElementById("addRecipe");
-  const addRecipeIcon = document.getElementById("addRecipeIcon");
-  const deleteRecipeBtn = document.getElementById("deleteRecipe");
   const selectedLabel = document.getElementById("selectedRecipeLabel");
   const tableContainer = document.getElementById("recipeTableContainer");
   const searchInput = document.getElementById("searchRecipe");
 
-  let recipesCache = []; // holds left tree list
+  const addRecipeBtn = document.getElementById("addRecipe");
+  const addRecipeIcon = document.getElementById("addRecipeIcon");
+  const deleteRecipeBtn = document.getElementById("deleteRecipe");
 
-  // ---------- Load recipes for tree ----------
+  let recipesCache = [];
+
+  /* ---------------- LOAD TREE ITEMS ---------------- */
   async function loadRecipes() {
-    try {
-      const res = await fetch("/api/recipes_data/get_recipes");
-      const data = await res.json();
-      recipesCache = data || [];
-      renderTree(recipesCache);
-    } catch (err) {
-      console.error("Failed to load recipes", err);
-    }
+    const res = await fetch("/api/recipes_data/get_recipes");
+    recipesCache = await res.json();
+    renderTree(recipesCache);
   }
 
   function renderTree(data) {
     childList.innerHTML = "";
-    if (!data || data.length === 0) {
+
+    if (!data.length) {
       childList.innerHTML = `<li class="no-data">No recipes found</li>`;
       return;
     }
@@ -95,345 +105,300 @@ document.addEventListener("DOMContentLoaded", () => {
       li.className = "file-node";
       li.dataset.id = r.id;
       li.dataset.name = r.name;
-      // file icon + name
-      li.innerHTML = `<i class='bx bx-file'></i><span class="recipe-name">${r.name}</span>`;
-      li.addEventListener("click", (ev) => { ev.stopPropagation(); selectRecipe(r); });
-      li.addEventListener("dblclick", (ev) => { ev.stopPropagation(); renameRecipePrompt(r); });
+
+      li.innerHTML = `<i class='bx bx-file'></i><span>${r.name}</span>`;
+
+      li.addEventListener("click", () => selectRecipe(r));
+      li.addEventListener("dblclick", () => renameRecipe(r));
+
       childList.appendChild(li);
     });
   }
 
-  // ---------- Select recipe -> load table ----------
+
+  /* ---------------- SELECT RECIPE → LOAD TABLE ---------------- */
   async function selectRecipe(recipe) {
-    document.querySelectorAll(".file-node").forEach(n => n.classList.remove("active"));
+    document.querySelectorAll(".file-node").forEach(x => x.classList.remove("active"));
     const node = document.querySelector(`.file-node[data-id='${recipe.id}']`);
     if (node) node.classList.add("active");
 
-    selectedLabel.textContent = `${recipe.name}`;
+    selectedLabel.textContent = recipe.name;
 
-    try {
-      const res = await fetch(`/api/recipes/${encodeURIComponent(recipe.name)}/table`);
-      const data = await res.json();
-      if (!data || data.length === 0) {
-        tableContainer.innerHTML = `<p class="placeholder">No data found for <b>${recipe.name}</b>.</p>`;
-        return;
-      }
-      tableContainer.innerHTML = "";
-      tableContainer.appendChild(buildTable(recipe.name, data));
-    } catch (err) {
-      console.error("Failed to load table", err);
-      tableContainer.innerHTML = `<p class="placeholder">Failed to load table</p>`;
+    const res = await fetch(`/api/recipes/${encodeURIComponent(recipe.name)}/table`);
+    const rows = await res.json();
+
+    if (!rows.length) {
+      tableContainer.innerHTML = `<p class="placeholder">No data found for <b>${recipe.name}</b>.</p>`;
+      return;
     }
+
+    tableContainer.innerHTML = "";
+    tableContainer.appendChild(buildTable(recipe.name, rows));
   }
 
-  // ---------- Build table (stocks-style) ----------
-  function buildTable(category, rows) {
-    const wrapper = document.createElement("div");
 
-    // Add Row btn above table (use this to add rows to the selected recipe)
-    const addRowBtnHtml = `
-      <div style="display:flex; justify-content:flex-start; margin-bottom:8px;">
-        <button class="add-btn" id="addRowRecipe">Add Row</button>
-      </div>`;
-    wrapper.innerHTML = addRowBtnHtml;
+  /* ---------------- BUILD TABLE (WITHOUT ADD ROW BUTTON) ---------------- */
+ 
+  function buildTable(category, rows) {
+
+    const wrapper = document.createElement("div");
 
     const table = document.createElement("table");
     table.className = "data-table";
+
     table.innerHTML = `
       <thead>
         <tr>
-          <th style="width:90px">Index</th>
-          <th style="width:70px">Silo</th>
-          <th>Material</th>
-          <th style="width:120px">Set</th>
-          <th style="width:120px">Fine</th>
-          <th style="width:120px">Tolerance</th>
-          <th style="width:120px">Action</th>
+          <th class="index-col" style="display:none;">Index</th>
+          <th>SiloNo</th>
+          <th>MaterialName</th>
+          <th>SetWeight(kg)</th>
+          <th>FineWeight(kg)</th>
+          <th>Tolerance(kg)</th>
+          <th>Action</th>
         </tr>
       </thead>
+
       <tbody id="recipeTableBody">
         ${rows.map(r => `
           <tr data-index="${r.Index}" data-category="${category}">
-            <td>${r.Index}</td>
-            <td>${r.SiloNo || ""}</td>
-            <td>${r.MaterialName || ""}</td>
-            <td>${r.SetWeight || ""}</td>
-            <td>${r.FineWeight || ""}</td>
-            <td>${r.Tolerance || ""}</td>
+            
+            <!-- Hidden Index Column -->
+            <td class="index-col" style="display:none;">${r.Index}</td>
+            
+            <td>${r.SiloNo}</td>
+            <td>${r.MaterialName}</td>
+            <td>${r.SetWeight}</td>
+            <td>${r.FineWeight}</td>
+            <td>${r.Tolerance}</td>
+
             <td class="action-cell">
-              <button class="table-action-btn edit-btn" title="Edit"><i class='bx bx-edit'></i></button>
-              <button class="table-action-btn delete-btn" title="Delete"><i class='bx bx-trash'></i></button>
+              <button class="table-action-btn edit-btn"><i class="bx bx-edit"></i></button>
+              <button class="table-action-btn delete-btn"><i class="bx bx-trash"></i></button>
             </td>
           </tr>
         `).join("")}
       </tbody>
     `;
+
     wrapper.appendChild(table);
     return wrapper;
   }
 
-  // ---------- Rename recipe (double-click) ----------
-  async function renameRecipePrompt(recipe) {
-    const newName = prompt("Rename recipe:", recipe.name);
-    if (!newName || newName.trim() === "" || newName.trim() === recipe.name) return;
-    try {
-      const res = await fetch("/api/recipes_data/rename_recipe", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ old_name: recipe.name, new_name: newName.trim() })
-      });
-      const result = await res.json();
-      if (result.success) {
-        await loadRecipes();
-        // auto-select renamed recipe
-        setTimeout(() => selectRecipe({ id: recipe.id, name: newName.trim() }), 150);
-      } else {
-        alert("Rename failed");
-      }
-    } catch (err) {
-      console.error("Rename error", err);
-      alert("Rename failed");
-    }
-  }
 
-  // ---------- Add Recipe ----------
-  async function addRecipe() {
-    const name = prompt("Enter new recipe name:");
-    if (!name || !name.trim()) return;
-    try {
-      const res = await fetch("/api/recipes_data/add_recipe", {
+
+
+  /* ---------------- ADD ROW (TOP BUTTON) ---------------- */
+  document.getElementById("addRowRecipe").addEventListener("click", () => {
+
+    const category = selectedLabel.textContent.trim();
+    if (category === "--") return alert("Select a recipe first.");
+
+    const tbody = document.getElementById("recipeTableBody");
+    if (!tbody) return;
+
+    const tr = document.createElement("tr");
+    tr.className = "new-row";
+
+    tr.innerHTML = `
+      <td><input class="edit-input silo" /></td>
+      <td><input class="edit-input material" disabled /></td>
+      <td><input class="edit-input set" /></td>
+      <td><input class="edit-input fine" /></td>
+      <td><input class="edit-input tol" /></td>
+      <td class="action-cell">
+        <button class="table-action-btn save-new"><i class="bx bx-check"></i></button>
+        <button class="table-action-btn cancel-new"><i class="bx bx-x"></i></button>
+      </td>
+    `;
+
+    tbody.prepend(tr);
+
+    const silo = tr.querySelector(".silo");
+    const material = tr.querySelector(".material");
+
+    silo.addEventListener("blur", async () => {
+      if (!silo.value) return material.value = "";
+      const res = await fetch(`/api/material/${silo.value}`);
+      const d = await res.json();
+      material.value = d.success ? d.MaterialName : "";
+    });
+
+    tr.querySelector(".cancel-new").onclick = () => tr.remove();
+
+    tr.querySelector(".save-new").onclick = async () => {
+      if (!silo.value.trim()) return alert("Silo required.");
+
+      const resMat = await fetch(`/api/material/${silo.value}`);
+      const matJson = await resMat.json();
+
+      if (!matJson.success) return alert("Invalid silo.");
+
+      const payload = {
+        SiloNo: silo.value.trim(),
+        MaterialName: matJson.MaterialName,
+        SetWeight: tr.querySelector(".set").value,
+        FineWeight: tr.querySelector(".fine").value,
+        Tolerance: tr.querySelector(".tol").value,
+        Category: category
+      };
+
+      const res = await fetch("/api/recipes_data/add_row", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), category: name.trim() })
+        body: JSON.stringify(payload)
       });
-      const result = await res.json();
-      if (result.success) {
-        await loadRecipes();
-      } else {
-        alert("Add recipe failed");
-      }
-    } catch (err) {
-      console.error("Add recipe error", err);
-      alert("Add recipe failed");
-    }
-  }
 
-  // ---------- Delete selected recipe ----------
-  async function deleteSelectedRecipe() {
-    const active = document.querySelector(".file-node.active");
-    if (!active) return alert("Select a recipe to delete.");
-    const name = active.dataset.name;
-    if (!confirm(`Delete recipe "${name}"?`)) return;
-    try {
-      const res = await fetch(`/api/recipes_data/delete_recipe/${encodeURIComponent(name)}`, { method: "DELETE" });
       const result = await res.json();
-      if (result.success) {
-        await loadRecipes();
-        tableContainer.innerHTML = `<p class="placeholder">Recipe deleted.</p>`;
-        selectedLabel.textContent = "--";
-      } else {
-        alert("Delete failed");
-      }
-    } catch (err) {
-      console.error("Delete recipe error", err);
-      alert("Delete failed");
-    }
-  }
+      if (result.success) selectRecipe({ id: 0, name: category });
+    };
+  });
 
-  // ---------- Global table actions (Add Row, Edit, Delete) ----------
+
+  /* ---------------- EDIT ROW ---------------- */
   document.addEventListener("click", async (e) => {
-    // Add Row: inject a new editable row at the top of tbody
-    if (e.target.closest("#addRowRecipe")) {
-      const tbody = document.getElementById("recipeTableBody");
-      if (!tbody) return;
-      const category = selectedLabel.textContent.replace("--", "").trim();
-      const tr = document.createElement("tr");
-      tr.className = "new-row";
-      tr.innerHTML = `
-        <td>New</td>
-        <td><input class="edit-input" id="newSilo" /></td>
-        <td><input class="edit-input" id="newMaterial" disabled /></td>
-        <td><input class="edit-input" id="newSet" /></td>
-        <td><input class="edit-input" id="newFine" /></td>
-        <td><input class="edit-input" id="newTol" /></td>
-        <td class="action-cell">
-          <button class="table-action-btn save-new"><i class='bx bx-check'></i></button>
-          <button class="table-action-btn cancel-new"><i class='bx bx-x'></i></button>
-        </td>
-      `;
-      tbody.prepend(tr);
 
-      // When Silo input loses focus or on Enter, attempt lookup and fill disabled Material
-      const siloInput = tr.querySelector("#newSilo");
-      const materialInput = tr.querySelector("#newMaterial");
-
-      siloInput.addEventListener("blur", async () => {
-        const silo = siloInput.value.trim();
-        if (!silo) { materialInput.value = ""; return; }
-        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
-        const matJson = await matRes.json();
-        if (!matJson.success) {
-          materialInput.value = "";
-          alert("Invalid Silo No — Material not found!");
-        } else {
-          materialInput.value = matJson.MaterialName || "";
-        }
-      });
-
-      // Save new row
-      tr.querySelector(".save-new").onclick = async () => {
-        const silo = siloInput.value.trim();
-        const material = materialInput.value.trim();
-        const set = tr.querySelector("#newSet").value.trim();
-        const fine = tr.querySelector("#newFine").value.trim();
-        const tol = tr.querySelector("#newTol").value.trim();
-
-        if (!silo) return alert("Silo No required");
-        // check Material exists (Option A)
-        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
-        const matJson = await matRes.json();
-        if (!matJson.success) {
-          alert("Invalid Silo No — Material not found!");
-          return;
-        }
-        const payload = {
-          SiloNo: silo,
-          MaterialName: matJson.MaterialName,
-          SetWeight: set,
-          FineWeight: fine,
-          Tolerance: tol,
-          Category: category
-        };
-        try {
-          const res = await fetch("/api/recipes_data/add_row", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify(payload)
-          });
-          const result = await res.json();
-          if (result.success) selectRecipe({ id: 0, name: category });
-          else alert("Add row failed");
-        } catch (err) { console.error(err); alert("Add row failed"); }
-      };
-
-      // Cancel new row
-      tr.querySelector(".cancel-new").onclick = () => tr.remove();
-    }
-
-    // Edit existing row
     if (e.target.closest(".edit-btn")) {
       const row = e.target.closest("tr");
-      if (!row || row.classList.contains("editing")) return;
+      if (row.classList.contains("editing")) return;
+
       row.classList.add("editing");
+
       const tds = row.querySelectorAll("td");
+      const silo = tds[1].innerText.trim();
+      const mat = tds[2].innerText.trim();
+      const set = tds[3].innerText.trim();
+      const fine = tds[4].innerText.trim();
+      const tol = tds[5].innerText.trim();
 
-      // Convert cells 1..5 into inputs - for Material we will show disabled input & fetch name if Silo changes
-      const siloVal = tds[1].textContent.trim();
-      const materialVal = tds[2].textContent.trim();
-      const setVal = tds[3].textContent.trim();
-      const fineVal = tds[4].textContent.trim();
-      const tolVal = tds[5].textContent.trim();
-
-      tds[1].innerHTML = `<input class="edit-input edit-silo" value="${siloVal}" />`;
-      tds[2].innerHTML = `<input class="edit-input edit-material" value="${materialVal}" disabled />`;
-      tds[3].innerHTML = `<input class="edit-input edit-set" value="${setVal}" />`;
-      tds[4].innerHTML = `<input class="edit-input edit-fine" value="${fineVal}" />`;
-      tds[5].innerHTML = `<input class="edit-input edit-tol" value="${tolVal}" />`;
+      tds[1].innerHTML = `<input class="edit-input edit-silo" value="${silo}">`;
+      tds[2].innerHTML = `<input class="edit-input edit-material" value="${mat}" disabled>`;
+      tds[3].innerHTML = `<input class="edit-input edit-set" value="${set}">`;
+      tds[4].innerHTML = `<input class="edit-input edit-fine" value="${fine}">`;
+      tds[5].innerHTML = `<input class="edit-input edit-tol" value="${tol}">`;
 
       tds[6].innerHTML = `
-        <button class="table-action-btn save-edit"><i class='bx bx-check'></i></button>
-        <button class="table-action-btn cancel-edit"><i class='bx bx-x'></i></button>
+        <button class="table-action-btn save-edit"><i class="bx bx-check"></i></button>
+        <button class="table-action-btn cancel-edit"><i class="bx bx-x"></i></button>
       `;
 
-      // When silo input blurred, lookup material
       const siloInput = tds[1].querySelector(".edit-silo");
       const matInput = tds[2].querySelector(".edit-material");
+
       siloInput.addEventListener("blur", async () => {
-        const silo = siloInput.value.trim();
-        if (!silo) { matInput.value = ""; return; }
-        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
-        const matJson = await matRes.json();
-        if (!matJson.success) {
-          matInput.value = "";
-          alert("Invalid Silo No — Material not found!");
-        } else {
-          matInput.value = matJson.MaterialName || "";
-        }
+        if (!siloInput.value.trim()) return matInput.value = "";
+        const d = await (await fetch(`/api/material/${siloInput.value}`)).json();
+        matInput.value = d.success ? d.MaterialName : "";
       });
 
-      // Cancel edit
-      tds[6].querySelector(".cancel-edit").onclick = () => {
+      tds[6].querySelector(".cancel-edit").onclick = () =>
         selectRecipe({ id: row.dataset.index, name: row.dataset.category });
-      };
 
-      // Save edit
       tds[6].querySelector(".save-edit").onclick = async () => {
-        const silo = siloInput.value.trim();
-        const matName = matInput.value.trim();
-        const setv = tds[3].querySelector(".edit-set").value.trim();
-        const finev = tds[4].querySelector(".edit-fine").value.trim();
-        const tolv = tds[5].querySelector(".edit-tol").value.trim();
 
-        if (!silo) return alert("Silo No required");
-        // validate silo exists
-        const matRes = await fetch(`/api/material/${encodeURIComponent(silo)}`);
-        const matJson = await matRes.json();
-        if (!matJson.success) {
-          alert("Invalid Silo No — Material not found!");
-          return;
-        }
+        const resMat = await fetch(`/api/material/${siloInput.value}`);
+        const matJson = await resMat.json();
+
+        if (!matJson.success) return alert("Invalid silo.");
 
         const payload = {
-          SiloNo: silo,
+          SiloNo: siloInput.value.trim(),
           MaterialName: matJson.MaterialName,
-          SetWeight: setv,
-          FineWeight: finev,
-          Tolerance: tolv
+          SetWeight: tds[3].querySelector(".edit-set").value,
+          FineWeight: tds[4].querySelector(".edit-fine").value,
+          Tolerance: tds[5].querySelector(".edit-tol").value
         };
 
-        try {
-          const res = await fetch(`/api/recipes_data/update_row/${row.dataset.index}`, {
-            method: "PUT",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify(payload)
-          });
-          const result = await res.json();
-          if (result.success) {
-            selectRecipe({ id: row.dataset.index, name: row.dataset.category });
-          } else alert("Update failed");
-        } catch (err) { console.error(err); alert("Update failed"); }
+        const res = await fetch(`/api/recipes_data/update_row/${row.dataset.index}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if ((await res.json()).success)
+          selectRecipe({ id: row.dataset.index, name: row.dataset.category });
       };
     }
 
-    // Delete row
+
+    /* ---------------- DELETE ROW ---------------- */
     if (e.target.closest(".delete-btn")) {
       const row = e.target.closest("tr");
       if (!confirm("Delete this row?")) return;
-      try {
-        const res = await fetch(`/api/recipes_data/delete_row/${row.dataset.index}`, { method: "DELETE" });
-        const result = await res.json();
-        if (result.success) row.remove();
-        else alert("Delete failed");
-      } catch (err) { console.error(err); alert("Delete failed"); }
+
+      const res = await fetch(`/api/recipes_data/delete_row/${row.dataset.index}`, {
+        method: "DELETE"
+      });
+
+      if ((await res.json()).success) row.remove();
     }
   });
 
-  // ---------- Tree search ----------
+
+  /* ---------------- RENAME RECIPE ---------------- */
+  async function renameRecipe(recipe) {
+    const newName = prompt("Rename recipe:", recipe.name);
+    if (!newName || newName.trim() === recipe.name) return;
+
+    const res = await fetch("/api/recipes_data/rename_recipe", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ old_name: recipe.name, new_name: newName.trim() })
+    });
+
+    if ((await res.json()).success) {
+      await loadRecipes();
+      setTimeout(() => selectRecipe({ id: recipe.id, name: newName.trim() }), 150);
+    }
+  }
+
+
+  /* ---------------- ADD RECIPE ---------------- */
+  async function addRecipe() {
+    const name = prompt("Enter new recipe name:");
+    if (!name) return;
+
+    await fetch("/api/recipes_data/add_recipe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+
+    loadRecipes();
+  }
+
+
+  /* ---------------- DELETE RECIPE ---------------- */
+  async function deleteSelectedRecipe() {
+    const active = document.querySelector(".file-node.active");
+    if (!active) return alert("Select a recipe first.");
+
+    const name = active.dataset.name;
+    if (!confirm(`Delete "${name}"?`)) return;
+
+    await fetch(`/api/recipes_data/delete_recipe/${encodeURIComponent(name)}`, {
+      method: "DELETE"
+    });
+
+    loadRecipes();
+    selectedLabel.textContent = "--";
+    tableContainer.innerHTML = `<p class="placeholder">Recipe deleted.</p>`;
+  }
+
+
+  /* ---------------- TREE SEARCH ---------------- */
   searchInput.addEventListener("input", () => {
-    const q = searchInput.value.trim().toLowerCase();
-    const nodes = Array.from(document.querySelectorAll(".file-node"));
-    nodes.forEach(n => {
-      const name = n.dataset.name.toLowerCase();
-      n.style.display = name.includes(q) ? "" : "none";
+    const q = searchInput.value.toLowerCase();
+    document.querySelectorAll(".file-node").forEach(n => {
+      n.style.display = n.dataset.name.toLowerCase().includes(q) ? "" : "none";
     });
   });
 
-  // ---------- top buttons ----------
-  addRecipeBtn.addEventListener("click", addRecipe);
+  /* Bind top buttons */
+  addRecipeBtn?.addEventListener("click", addRecipe);
   addRecipeIcon.addEventListener("click", addRecipe);
   deleteRecipeBtn.addEventListener("click", deleteSelectedRecipe);
 
-  // initial load
   loadRecipes();
 });
 </script>

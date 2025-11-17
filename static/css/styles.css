@@ -604,6 +604,10 @@ body {
     border-color: #005da2;
 }
 
+.index-col {
+  display: none !important;
+}
+
 /* Color overrides */
 .save-new i,
 .save-edit i {

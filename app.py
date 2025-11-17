@@ -94,14 +94,32 @@ def get_recipes():
 def add_recipe():
     data = request.json
     name = data.get("name")
-    category = data.get("category", name)
+    
     if not name:
         return jsonify({"success": False, "error": "name required"}), 400
+
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-    cursorWrite.execute("INSERT INTO recipes (name, category) VALUES (?, ?)", (name, category))
+
+    # Insert into recipes table
+    cursorWrite.execute(
+        "INSERT INTO recipes (name, category) VALUES (?, ?)",
+        (name, name)
+    )
+    conn.commit()
+
+    # Insert an EMPTY row without Index (Index will be auto-handled later)
+    cursorWrite.execute("""
+        INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
+        VALUES ('', '', '', '', '', ?)
+    """, (name,))
+
     conn.commit()
     conn.close()
+
     return jsonify({"success": True})
+
+
+
 
 @app.route("/api/recipes_data/delete_recipe/<string:name>", methods=["DELETE"])
 def delete_recipe(name):
@@ -130,13 +148,19 @@ def get_recipe_table(category):
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
     query = """
         SELECT r."Index", r.SiloNo,
-               COALESCE(m.MaterialName, r.MaterialName) AS MaterialName,
-               r.SetWeight, r.FineWeight, r.Tolerance
+            COALESCE(m.MaterialName, r.MaterialName) AS MaterialName,
+            r.SetWeight, r.FineWeight, r.Tolerance
         FROM recipeData r
         LEFT JOIN MaterialData m ON r.SiloNo = m.SiloNo
         WHERE r.Category = ?
-        ORDER BY r.SiloNo
+        
     """
+    # query = """
+    #     SELECT "Index", SiloNo, MaterialName, SetWeight, FineWeight, Tolerance
+    #     FROM recipeData
+    #     WHERE Category = ?
+    #     """
+
     cursorRead.execute(query, (category,))
     data = cursorRead.fetchall()
     cols = [desc[0] for desc in cursorRead.description]
@@ -163,6 +187,7 @@ def add_row():
         data.get("SetWeight"), data.get("FineWeight"),
         data.get("Tolerance"), data.get("Category")
     ))
+  
     conn.commit()
     conn.close()
     return jsonify({"success": True})
@@ -190,10 +215,31 @@ def update_row(index):
 @app.route("/api/recipes_data/delete_row/<int:index>", methods=["DELETE"])
 def delete_row(index):
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    # STEP 1: Delete selected row
     cursorWrite.execute('DELETE FROM recipeData WHERE "Index"=?', (index,))
     conn.commit()
+
+    # STEP 2: Read all remaining rows ordered by old Index
+    cursorRead.execute('SELECT rowid FROM recipeData ORDER BY "Index" ASC')
+    rows = cursorRead.fetchall()
+
+    # STEP 3: Reset index from 1...N
+    new_index = 1
+    for row in rows:
+        cursorWrite.execute(
+            'UPDATE recipeData SET "Index"=? WHERE rowid=?',
+            (new_index, row[0])
+        )
+        new_index += 1
+
+    conn.commit()
     conn.close()
+
     return jsonify({"success": True})
+
+
+
 
 @app.route('/report')
 def report():
@@ -605,34 +651,51 @@ def settings():
 
 @app.route('/stocks')
 def stocks():
+    use
     return render_template('stocks.html')
 
 # ✅ API Route — returns live data for the Stocks table
 @app.route("/api/stocks", methods=["GET"])
 def get_stocks_data():
     try:
-        # Connect to your SQLite DB
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-        # Query your MaterialData table
-        query = "SELECT SiloNo, MaterialName, MaterialCode, OperatorName, TotalExtracted FROM MaterialData"
+
+        query = """
+            SELECT SiloNo, MaterialName, MaterialCode, OperatorName, TotalExtracted
+            FROM MaterialData
+        """
         df = pd.read_sql(query, conn)
 
-        # Assign row index as ID
-        df.reset_index(inplace=True)
-        df.rename(columns={"index": "Id"}, inplace=True)
+        # REMOVE rows where SiloNo is NULL, empty string, or '-'
+        df = df[df["SiloNo"].notna()]              # drop NULL
+        df = df[df["SiloNo"].astype(str).str.strip() != ""]   # drop empty string
+        df = df[df["SiloNo"].astype(str).str.strip() != "-"]  # drop '-'
 
-        # Convert NaN to empty
+        # Convert SiloNo to integer safely
+        df["SiloNo"] = pd.to_numeric(df["SiloNo"], errors="coerce")
+        df = df.dropna(subset=["SiloNo"])  # drop rows that still could not convert
+        df["SiloNo"] = df["SiloNo"].astype(int)
+
+        # Fill remaining NaN values
         df = df.fillna("")
 
-        # Convert to list of dicts for JSON
-        records = df.to_dict(orient="records")
+        # Add unique id
+        df.reset_index(drop=True, inplace=True)
+        df.insert(0, "Id", df.index + 1)
 
-        return jsonify({"success": True, "records": records})
-    
+        # Sort descending
+        df_sorted = df.sort_values(by="SiloNo", ascending=True)
+
+        # Convert to records
+        return jsonify({
+            "success": True,
+            "records": df_sorted.to_dict(orient="records")
+        })
+
     except Exception as e:
         print("❌ Error reading stock data:", e)
         return jsonify({"success": False, "error": str(e)})
-    
+
     finally:
         try:
             conn.close()
@@ -709,13 +772,12 @@ def update_user_password():
         return jsonify(success=False, error="Invalid data")
 
     try:
-        conn = sqliteCon.get_db_connection()
-        cur = conn.cursor()
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        
         hashed = generate_password_hash(new_password)
 
-        cur.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hashed, username))
+        cursorWrite.execute("UPDATE users SET password_hash = ? WHERE user_name = ?", (hashed, username))
         conn.commit()
-        cur.close()
         conn.close()
         return jsonify(success=True)
     except Exception as e:
@@ -746,15 +808,15 @@ def change_password():
 
     username = session['username']
 
-    conn = sqliteCon.get_db_connection()
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
     if conn is None:
         return jsonify(success=False, error="Database connection error"), 500
 
     try:
-        cur = conn.cursor()
+
         # Fetch the stored password hash
-        cur.execute('SELECT password_hash FROM users WHERE username = ?', (username,))
-        row = cur.fetchone()
+        cursorWrite.execute('SELECT password_hash FROM users WHERE user_name = ?', (username,))
+        row = cursorWrite.fetchone()
 
         if not row:
             return jsonify(success=False, error="User not found"), 404
@@ -765,7 +827,7 @@ def change_password():
             # If old password matches, update with new password
             new_password_hash = generate_password_hash(new_password)
 
-            cur.execute('UPDATE users SET password_hash = ? WHERE username = ?', (new_password_hash, username))
+            cursorWrite.execute('UPDATE users SET password_hash = ? WHERE user_name = ?', (new_password_hash, username))
             conn.commit()
 
             return jsonify(success=True)
@@ -777,7 +839,6 @@ def change_password():
         return jsonify(success=False, error=str(e)), 500
 
     finally:
-        cur.close()
         conn.close()
 
 

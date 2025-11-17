@@ -15,5 +15,7 @@ openpyxl
 psycopg2
 pandas
 SQLAlchemy
+plotly
+numpy
 
 

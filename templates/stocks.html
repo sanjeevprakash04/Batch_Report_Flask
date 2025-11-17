@@ -21,6 +21,7 @@
         <th>Raw Material Name</th>
         <th>Raw Material Code</th>
         <th>Operator Name</th>
+        <th>TotalExtracted(kg)</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -60,6 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <td>${row.MaterialName || "-"}</td>
           <td>${row.MaterialCode || "-"}</td>
           <td>${row.OperatorName || "-"}</td>
+          <td>${row.TotalExtracted || "0"}</td>
           <td class="action-cell">
             <button class="table-action-btn edit-btn" title="Edit"><i class='bx bx-edit'></i></button>
             <button class="table-action-btn delete-btn" title="Delete"><i class='bx bx-trash'></i></button>

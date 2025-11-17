@@ -61,7 +61,8 @@ for command in sql_commands.strip().split(';'):
 
 # === Insert default users ===
 users = [
-    ("superadmin", "etilorP$1234", "SuperAdmin", "Active"),
+    ("operator", "12345678", "Operator", "Active"),
+    ("admin", "12345678", "Admin", "Active"),
 ]
 
 for username, password, role, status in users:
