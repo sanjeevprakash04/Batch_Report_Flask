@@ -8,6 +8,7 @@
 
   <div class="inv-navbar-right">
     <button class="add-btn" id="addRowBtn">Add</button>
+    <button class="add-btn" id="exportBtn">Export</button>
     <input class="search-input" type="text" id="searchBox" placeholder="Search...">
   </div>
 </div>
@@ -39,6 +40,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tableBody = document.getElementById("stocksTableBody");
   const searchBox = document.getElementById("searchBox");
   const addRowBtn = document.getElementById("addRowBtn");
+  const exportBtn = document.getElementById("exportBtn");
+  
 
   // ✅ Load all stock records
   async function loadStocks() {
@@ -86,6 +89,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       <td><input type="text" placeholder="Material Name" class="edit-input" /></td>
       <td><input type="text" placeholder="Material Code" class="edit-input" /></td>
       <td><input type="text" placeholder="Operator Name" class="edit-input" /></td>
+      <td><input type="text" value="0" class="edit-input" disabled /></td>
+
       <td class="action-cell">
         <button class="table-action-btn save-new-btn" title="Save"><i class='bx bx-check'></i></button>
         <button class="table-action-btn cancel-new-btn" title="Cancel"><i class='bx bx-x'></i></button>
@@ -118,8 +123,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
 
       const result = await res.json();
-      if (result.success) loadStocks();
-      else alert("❌ Failed to add record");
+      if (result.success) {
+          loadStocks();
+      } else {
+          alert(result.error || "❌ Update failed");
+      }
+
     });
 
     // ❌ Cancel new row
@@ -141,8 +150,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const cells = row.querySelectorAll("td");
       for (let i = 0; i < cells.length - 1; i++) {
         const val = cells[i].textContent.trim();
-        cells[i].innerHTML = `<input type="text" value="${val}" class="edit-input" />`;
+
+        if (i === 4) {
+          cells[i].innerHTML = `<input type="text" value="${val}" class="edit-input" disabled />`;
+        } else {
+          cells[i].innerHTML = `<input type="text" value="${val}" class="edit-input" />`;
+        }
       }
+
 
       const actionCell = cells[cells.length - 1];
       actionCell.innerHTML = `
@@ -153,23 +168,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       // ✅ Save edited record
       actionCell.querySelector(".save-btn").addEventListener("click", async () => {
         const inputs = row.querySelectorAll("input");
+
         const updated = {
-          SiloNo: siloNo,
-          MaterialName: inputs[1].value,
-          MaterialCode: inputs[2].value,
-          OperatorName: inputs[3].value,
+            SiloNo: inputs[0].value.trim(),           // ✔️ correct value
+            MaterialName: inputs[1].value.trim(),
+            MaterialCode: inputs[2].value.trim(),
+            OperatorName: inputs[3].value.trim(),
         };
 
         const res = await fetch(`/api/stocks/update/${siloNo}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updated),
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updated),
         });
 
         const result = await res.json();
-        if (result.success) loadStocks();
-        else alert("❌ Update failed");
-      });
+        if (result.success) {
+            loadStocks();
+        } else {
+            alert(result.error || "❌ Update failed");
+        }
+    });
 
       // ❌ Cancel edit
       actionCell.querySelector(".cancel-btn").addEventListener("click", () => loadStocks());
@@ -199,7 +218,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       row.style.display = text.includes(filter) ? "" : "none";
     });
   });
+  
+  // 📌 Export Excel
+  exportBtn.addEventListener("click", async () => {
+      const res = await fetch("/api/stocks/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}) // no filters needed
+      });
 
+      if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "MaterialData.xlsx";
+          a.click();
+
+          window.URL.revokeObjectURL(url);
+      } else {
+          const err = await res.json();
+          alert(err.error || "Export failed");
+      }
+  });
   loadStocks();
 });
 </script>

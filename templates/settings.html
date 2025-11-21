@@ -2,64 +2,89 @@
 
 {% block content %}
 <div class="inv-navbar">
-    <!-- Left side: menu + name -->
     <div class="inv-navbar-left">
         <span class="inv-app-title">Settings</span>
     </div>
 </div>
+
 <div class="settings-content">
+
     <div class="upper">
+
+        {% if user in ['admin', 'superadmin'] %}
         <div class="upper-left">
-            <span style="padding: 0.65rem 0.6rem; background-color: #005da2; color:white;">Configure Connection</span>
+            <span style="padding:0.65rem 0.6rem; background:#005da2;color:white;">General Settings</span>
+
+            <div class="top">
+                <span>Enter Email ID</span>
+                <input type="email" style="margin-left:1.3rem" placeholder="Enter Email ID">
+                <button style="margin-left:1rem;">Set Email</button>
+            </div>
+
+            <div class="bottom">
+                <span>Report Name</span>
+                <input type="text" style="margin-left:1.7rem" placeholder="Enter Report Name">
+                <button style="margin-left:1rem;">Set Name</button>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if user == 'superadmin' %}
+        <div class="upper-right">
+            <span style="padding:0.65rem 0.6rem;background:#005da2;color:white;">Configure Connection</span>
+
             <div class="top">
                 <span>Select Connection Driver</span>
-                <select class="settings-select" style="margin-left: 8rem;">
+                <select class="settings-select" style="margin-left:8rem;">
                     <option>Siemens</option>
                     <option>Rockwell</option>
                 </select>
             </div>
+
             <div class="bottom">
-                <span>Specify the Node or Driver Specific Station</span>
-                <input style="margin-left:0.5rem" placeholder="Enter IP address"/>
+                <span>Specify Node / Station IP</span>
+                <input type="text" style="margin-left:0.5rem" placeholder="Enter IP Address">
             </div>
         </div>
-        <div class="upper-right">
-            <span style="padding: 0.65rem 0.6rem; background-color: #005da2; color:white;">Configure Data</span>
-            <div class="top">
-                <span>Upload the new PLC DB Configuration</span>
-                <button style="margin-left: 8.4rem;">Upload</button>
-                <input type="" hidden/>
-            </div>
-            <div class="bottom">
-                <span>For Reference, Download the PLC DB COnfiguration</span>
-                <button style="margin-left: 2rem;">Download</button>
-            </div>
-        </div>
+        {% endif %}
+
     </div>
+
     <div class="lower">
+
+        {% if user in ['admin', 'superadmin'] %}
         <div class="lower-left">
-            <span style="padding: 0.65rem 0.6rem; background-color: #005da2; color:white;">General Settings</span>
-            <div class="top">
-                <span>Enter EMail ID</span>
-                <input type="" style="margin-left:1.3rem" placeholder="Enter Email ID"/>
-                <button style="margin-left: 1rem;">Set Email</button>
-            </div>
-            <div class="bottom">
-                <span>Report Name</span>
-                <input type="" style="margin-left:1.7rem" placeholder="Enter Report Name"/>
-                <button style="margin-left: 1rem;">Set Name</button>
-            </div>
-        </div>
-        <div class="lower-right">
-            <span style="padding: 0.65rem 0.6rem; background-color: #005da2; color:white;">Database Backup</span>
+            <span style="padding:0.65rem 0.6rem;background:#005da2;color:white;">Database Backup</span>
             <div class="one">
                 <span>Save Database Backup</span>
-                <button style="margin-left: 13.8rem;">Save</button>
+                <button style="margin-left:13.8rem;">Save</button>
             </div>
         </div>
+        {% endif %}
+        {% if user == 'superadmin' %}
+        
+        <div class="lower-right">
+            <span style="padding:0.65rem 0.6rem;background:#005da2;color:white;">Configure Data</span>
+
+            <div class="top">
+                <span>Upload PLC DB Configuration</span>
+                <button style="margin-left:8.4rem;">Upload</button>
+                <input type="file" hidden>
+            </div>
+
+            <div class="bottom">
+                <span>Download PLC DB Configuration</span>
+                <button style="margin-left:2rem;">Download</button>
+            </div>
+
+        </div>
+        {% endif %}
+
     </div>
     <div class="bottom-content">
         
     </div>
+
 </div>
+
 {% endblock %}

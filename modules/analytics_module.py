@@ -4,14 +4,51 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from config import sqliteCon as sqliteCon
+import sqlite3
+from sqlalchemy import create_engine
 
+DB_CONFIG = "PLCDB2.db"
+
+
+# === Direct SQLite Connection (for raw cursor use) ===
+def get_db_connection():
+    try:
+        conn = sqlite3.connect(DB_CONFIG)
+        conn.row_factory = sqlite3.Row  # Dict-like cursor
+        cursorRead = conn.cursor()
+        cursorWrite = conn.cursor()
+        return conn, cursorRead, cursorWrite
+    except Exception as e:
+        print(f"Failed to connect to SQLite: {e}")
+        return None
+
+
+
+# === SQLAlchemy Engine for pandas.to_sql and read_sql ===
+def get_db_connection_engine():
+    try:
+        # SQLite connection URL
+        db_url = f"sqlite:///{DB_CONFIG}"
+
+        # Create SQLAlchemy engine
+        engine = create_engine(db_url, echo=False)
+
+        # Separate read and write connections
+        engineConRead = engine.connect()
+        engineConWrite = engine.connect()
+
+        print("✅ SQLite SQLAlchemy engine created successfully.")
+        return engine, engineConRead, engineConWrite
+
+    except Exception as e:
+        print(f"❌ Failed to create SQLAlchemy engine: {e}")
+        return None, None, None
 
 # -------------------- DATA CLEANING --------------------
 def get_cleaned_data():
     # ✅ Get DB connections
-    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-    engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+    conn, cursorRead, cursorWrite = get_db_connection()
+    engine, engineConRead, engineConWrite = get_db_connection_engine()
 
     df = pd.read_sql("SELECT * FROM plc_data", engineConRead)
     print("🔹 Raw data loaded:", df.shape)
@@ -279,8 +316,15 @@ def run_dashboard():
     </html>
     '''
 
-    app.run(host='127.0.0.1', port=8050, debug=True, use_reloader=False)
+    app.run(
+        host="0.0.0.0",
+        port=8050,
+        debug=False,
+        use_reloader=False
+    )
+
 
 
 if __name__ == "__main__":
     run_dashboard()
+

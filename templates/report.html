@@ -7,7 +7,9 @@
 <div class="inv-navbar">
   <div class="inv-navbar-left">
     <span class="inv-app-title">Report</span>
+   
   </div>
+  
 
   <div class="inv-navbar-right">
     <select id="hourSelect" class="inv-select">
@@ -33,6 +35,8 @@
     <span id="totalLabel" class="total-label">Total Batch Weight (in Tons): --</span>
   </div>
 </div>
+
+
 
 <!-- ===============================
       REPORT TABLE
@@ -78,9 +82,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const hourSelect = document.getElementById("hourSelect");
   const fromDate = document.getElementById("fromDate");
   const toDate = document.getElementById("toDate");
+  
   const totalLabel = document.getElementById("totalLabel");
-  const tableHead = document.querySelector("#reportTable thead");
-  const tableBody = document.querySelector("#reportTable tbody");
+  const table = document.getElementById("reportTable");
+  const tableHead = table.querySelector("thead");
+  const tableBody = table.querySelector("tbody");
   const viewBtn = document.getElementById("viewBtn");
   const exportBtn = document.getElementById("exportBtn");
 
@@ -90,7 +96,103 @@ document.addEventListener("DOMContentLoaded", () => {
   const popupTableBody = document.querySelector("#popupTable tbody");
   const closePopup = document.getElementById("closePopup");
 
-  // ✅ Fetch and display main report
+  // ===========================================
+  // 1️⃣ Disable future date/time
+  // ===========================================
+  const now = new Date().toISOString().slice(0, 16);
+  fromDate.max = now;
+  toDate.max = now;
+
+  // ===========================================
+  // 2️⃣ Auto-select "Custom" when user clicks From/To
+  // ===========================================
+  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+  toDate.addEventListener("click", () => hourSelect.value = "Custom");
+
+  // ===========================================
+  // 3️⃣ Clear From/To when dropdown ≠ Custom
+  // ===========================================
+  hourSelect.addEventListener("change", () => {
+    if (hourSelect.value !== "Custom") {
+      fromDate.value = "";
+      toDate.value = "";
+    }
+  });
+
+  // ===========================================
+  // 🔄 Restore session on load
+  // ===========================================
+  function restoreSession() {
+    const savedFilters = JSON.parse(localStorage.getItem("report_filters"));
+    const savedTable = JSON.parse(localStorage.getItem("report_table"));
+    const savedTotal = localStorage.getItem("report_total");
+
+    if (savedFilters) {
+      hourSelect.value = savedFilters.hours;
+      fromDate.value = savedFilters.from_time;
+      toDate.value = savedFilters.to_time;
+    }
+
+    if (savedTable && savedTable.length > 0) {
+      renderTable(savedTable);
+      totalLabel.textContent = `Total Batch Weight (in Tons): ${savedTotal}`;
+    }
+  }
+  restoreSession();
+
+  // ===========================================
+  // Render table + sorting + click handlers
+  // ===========================================
+  function renderTable(data) {
+    const columns = Object.keys(data[0]);
+
+    tableHead.innerHTML = `
+      <tr>
+        ${columns.map(col => `<th data-col="${col}" class="sortable">${col}</th>`).join('')}
+      </tr>
+    `;
+
+    tableBody.innerHTML = "";
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = columns.map(c => `<td>${row[c] ?? ""}</td>`).join("");
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => openPopup(row["BatchNo"]));
+      tableBody.appendChild(tr);
+    });
+
+    enableSorting(data);
+  }
+
+  // ===========================================
+  // 4️⃣ Sorting Logic
+  // ===========================================
+  function enableSorting(data) {
+    const headers = tableHead.querySelectorAll("th");
+    headers.forEach(th => {
+      th.addEventListener("click", () => {
+        const col = th.getAttribute("data-col");
+        const asc = th.classList.toggle("asc");
+
+        data.sort((a, b) => {
+          if (!isNaN(a[col]) && !isNaN(b[col])) {
+            return asc ? a[col] - b[col] : b[col] - a[col];
+          }
+          return asc
+            ? String(a[col]).localeCompare(String(b[col]))
+            : String(b[col]).localeCompare(String(a[col]));
+        });
+
+        renderTable(data);
+      });
+    });
+  }
+
+  
+
+  // ===========================================
+  // Fetch main report
+  // ===========================================
   viewBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
@@ -102,8 +204,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     tableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    tableBody.innerHTML = `<tr><td colspan="1" style="text-align:center;">Loading data...</td></tr>`;
-    totalLabel.textContent = "Total Batch Weight (in Tons): --";
+    tableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
+    totalLabel.textContent = "--";
 
     try {
       const res = await fetch("/api/report_data", {
@@ -113,7 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Failed to load");
+      if (!result.success) throw new Error(result.error);
 
       const data = result.data || [];
       if (data.length === 0) {
@@ -122,28 +224,21 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const columns = Object.keys(data[0]);
-      tableHead.innerHTML = `<tr>${columns.map(col => `<th>${col}</th>`).join('')}</tr>`;
-      tableBody.innerHTML = "";
-
-      data.forEach(row => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = columns.map(col => `<td>${row[col] ?? ""}</td>`).join('');
-        tr.style.cursor = "pointer";
-        tr.addEventListener("click", () => openPopup(row["BatchNo"]));
-        tableBody.appendChild(tr);
-      });
-
+      renderTable(data);
       totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
 
+      localStorage.setItem("report_filters", JSON.stringify({ hours, from_time, to_time }));
+      localStorage.setItem("report_table", JSON.stringify(data));
+      localStorage.setItem("report_total", result.total_weight);
+
     } catch (err) {
-      console.error("❌ Error loading report:", err);
-      tableHead.innerHTML = `<tr><th>Error</th></tr>`;
-      tableBody.innerHTML = `<tr><td>Error loading data</td></tr>`;
+      console.error(err);
     }
   });
 
-  // ✅ Export main report as Excel
+  // ===========================================
+  // Export (Excel)
+  // ===========================================
   exportBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
@@ -154,94 +249,74 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    try {
-      const res = await fetch("/api/export_data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hours, from_time, to_time })
-      });
+    const res = await fetch("/api/export_data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
 
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Report_${hours.replace(" ", "_")}.xlsx`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-
-    } catch (err) {
-      console.error("❌ Export error:", err);
-      alert("Export failed — check console for details.");
-    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Report.xlsx";
+    a.click();
+    window.URL.revokeObjectURL(url);
   });
 
-  // ✅ Open popup (with fixed column order)
+  // ===========================================
+  // Popup Logic
+  // ===========================================
   async function openPopup(batchNo) {
     popup.style.display = "flex";
     popupTitle.textContent = `PLC Data for BatchNo: ${batchNo}`;
     popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    popupTableBody.innerHTML = `<tr><td>Loading data...</td></tr>`;
+    popupTableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
 
-    try {
-      const res = await fetch("/api/plc_data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_no: batchNo })
-      });
+    const res = await fetch("/api/plc_data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_no: batchNo })
+    });
 
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Error fetching PLC data");
+    const result = await res.json();
+    const data = result.data;
 
-      const data = result.data;
-      if (!data || data.length === 0) {
-        popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-        popupTableBody.innerHTML = `<tr><td>No PLC Data Found</td></tr>`;
-        return;
-      }
-
-      // ✅ Fixed column order as per your desired layout
-      const cols = ["Category", "SiloNo", "MaterialName", "SetWeight", "ActualWeight", "Difference", "Tolerance"];
-
-      popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-      popupTableBody.innerHTML = data.map(row =>
-        `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join('')}</tr>`
-      ).join('');
-
-      document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
-      document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
-
-    } catch (err) {
-      popupTableHead.innerHTML = `<tr><th>Error</th></tr>`;
-      popupTableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
+    if (!data || data.length === 0) {
+      popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
+      popupTableBody.innerHTML = `<tr><td>No PLC data found</td></tr>`;
+      return;
     }
+
+    const cols = ["Category","SiloNo","MaterialName","SetWeight","ActualWeight","Difference","Tolerance"];
+    popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+    popupTableBody.innerHTML = data.map(row =>
+      `<tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>`
+    ).join("");
+
+    document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
+    document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
   }
 
-  // ✅ Close popup
   closePopup.addEventListener("click", () => popup.style.display = "none");
 
-  // ✅ Handle PDF & Excel download from popup
   async function downloadReport(type, batchNo) {
     const endpoint = type === "pdf" ? "/api/plc_data/pdf" : "/api/plc_data/excel";
     const filename = `BatchReport_${batchNo}.${type === "pdf" ? "pdf" : "xlsx"}`;
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batch_no: batchNo })
-      });
-      if (!res.ok) throw new Error("Download failed");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(`❌ ${type.toUpperCase()} Download Error:`, err);
-      alert(`Failed to download ${type.toUpperCase()} report`);
-    }
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch_no: batchNo })
+    });
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 
 });

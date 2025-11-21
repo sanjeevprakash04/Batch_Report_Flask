@@ -6,6 +6,9 @@ import os
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
+import platform
+
+wkhtml_path = '/usr/bin/wkhtmltopdf' if platform.system() == 'Linux' else 'data_files/wkhtmltopdf/bin/wkhtmltopdf.exe'
 
 # ==========================================================
 # 🔹 Utility Functions
@@ -58,7 +61,7 @@ def generate_pdf_report(df_pivot, df_string, batch_no):
     pdf_bytes = pdfkit.from_string(
         html,
         False,
-        configuration=pdfkit.configuration(wkhtmltopdf='data_files/wkhtmltopdf/bin/wkhtmltopdf.exe'),
+        configuration=pdfkit.configuration(wkhtmltopdf=wkhtml_path),
         options={
             "enable-local-file-access": "",
             "margin-top": "12mm",

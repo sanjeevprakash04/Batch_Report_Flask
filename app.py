@@ -8,6 +8,7 @@ import json
 import webbrowser
 import threading
 import plotly
+import subprocess
 
 #Modules
 from auth import authLog, authMac
@@ -94,29 +95,45 @@ def get_recipes():
 def add_recipe():
     data = request.json
     name = data.get("name")
-    
-    if not name:
-        return jsonify({"success": False, "error": "name required"}), 400
+
+    if not name or name.strip() == "":
+        return jsonify({"success": False, "error": "Recipe name required"}), 400
+
+    name = name.strip()
 
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
 
-    # Insert into recipes table
-    cursorWrite.execute(
-        "INSERT INTO recipes (name, category) VALUES (?, ?)",
-        (name, name)
-    )
-    conn.commit()
+    # 🔍 Check if recipe already exists
+    cursorRead.execute("SELECT COUNT(*) FROM recipes WHERE name = ?", (name,))
+    exists = cursorRead.fetchone()[0]
 
-    # Insert an EMPTY row without Index (Index will be auto-handled later)
-    cursorWrite.execute("""
-        INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
-        VALUES ('', '', '', '', '', ?)
-    """, (name,))
+    if exists > 0:
+        conn.close()
+        return jsonify({"success": False, "error": "Recipe already exists"}), 409
 
-    conn.commit()
-    conn.close()
+    try:
+        # ✅ Insert into recipes table
+        cursorWrite.execute(
+            "INSERT INTO recipes (name, category) VALUES (?, ?)",
+            (name, name)
+        )
+        conn.commit()
 
-    return jsonify({"success": True})
+        # ✅ Insert an EMPTY row in recipeData
+        cursorWrite.execute("""
+            INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
+            VALUES ('', '', '', '', '', ?)
+        """, (name,))
+        conn.commit()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print("❌ Error adding recipe:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    finally:
+        conn.close()
 
 
 
@@ -134,14 +151,48 @@ def rename_recipe():
     data = request.json
     old = data.get("old_name")
     new = data.get("new_name")
+
+    # Validate
     if not old or not new:
         return jsonify({"success": False, "error": "old_name and new_name required"}), 400
+
+    old = old.strip()
+    new = new.strip()
+
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-    cursorWrite.execute("UPDATE recipes SET name=? WHERE name=?", (new, old))
-    cursorWrite.execute("UPDATE recipeData SET Category=? WHERE Category=?", (new, old))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+
+    # 🔍 Check if old recipe exists
+    cursorRead.execute("SELECT COUNT(*) FROM recipes WHERE name = ?", (old,))
+    old_exists = cursorRead.fetchone()[0]
+
+    if old_exists == 0:
+        conn.close()
+        return jsonify({"success": False, "error": "Old recipe does not exist"}), 404
+
+    # 🔍 Check if new recipe name already exists
+    cursorRead.execute("SELECT COUNT(*) FROM recipes WHERE name = ?", (new,))
+    new_exists = cursorRead.fetchone()[0]
+
+    if new_exists > 0:
+        conn.close()
+        return jsonify({"success": False, "error": "New recipe name already exists"}), 409
+
+    try:
+        # Start rename
+        cursorWrite.execute("UPDATE recipes SET name=? WHERE name=?", (new, old))
+        cursorWrite.execute("UPDATE recipeData SET Category=? WHERE Category=?", (new, old))
+
+        conn.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        conn.rollback()
+        print("❌ Rename error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    finally:
+        conn.close()
+
 
 @app.route("/api/recipes/<string:category>/table", methods=["GET"])
 def get_recipe_table(category):
@@ -171,46 +222,279 @@ def get_recipe_table(category):
 def add_row():
     data = request.json
     silo = data.get("SiloNo")
-    # ensure material exists (Option A)
+    category = data.get("Category")
+
+    # Validate inputs
+    if not silo or not category:
+        return jsonify({"success": False, "error": "SiloNo and Category required"}), 400
+
+    silo = str(silo).strip()
+    category = category.strip()
+
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    # --------------------------------------------------------------
+    # 1️⃣ Check if Silo exists in MaterialData
+    # --------------------------------------------------------------
     cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo=?", (silo,))
     mrow = cursorRead.fetchone()
+
     if not mrow:
         conn.close()
-        return jsonify({"success": False, "error": "silo_not_found"}), 400
+        return jsonify({"success": False, "error": "silo_not_found"}), 404
+
     material_name = mrow[0]
-    cursorWrite.execute("""
-        INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        silo, material_name,
-        data.get("SetWeight"), data.get("FineWeight"),
-        data.get("Tolerance"), data.get("Category")
-    ))
-  
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+
+    # --------------------------------------------------------------
+    # 2️⃣ Check if SAME SiloNo already exists in recipeData under SAME Category
+    # --------------------------------------------------------------
+    cursorRead.execute("""
+        SELECT COUNT(*) 
+        FROM recipeData 
+        WHERE SiloNo = ? AND Category = ?
+    """, (silo, category))
+
+    exists = cursorRead.fetchone()[0]
+
+    if exists > 0:
+        conn.close()
+        return jsonify({"success": False, "error": "silo_already_exists"}), 409
+
+    # --------------------------------------------------------------
+    # 3️⃣ Insert new recipe row
+    # --------------------------------------------------------------
+    try:
+        cursorWrite.execute("""
+            INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            silo,
+            material_name,
+            data.get("SetWeight"),
+            data.get("FineWeight"),
+            data.get("Tolerance"),
+            category
+        ))
+
+        conn.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        conn.rollback()
+        print("❌ Add Row Error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    finally:
+        conn.close()
+
+@app.route('/api/recipes/export', methods=['POST'])
+def export_recipe_data():
+    try:
+        payload = request.get_json()
+        category = payload.get("category")
+
+        if not category:
+            return jsonify({"success": False, "error": "No category provided"}), 400
+
+        print(f"📤 Export Recipe → {category}")
+
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+        query = """
+            SELECT 
+                r.SiloNo,
+                COALESCE(m.MaterialName, r.MaterialName) AS MaterialName,
+                r.SetWeight,
+                r.FineWeight,
+                r.Tolerance
+            FROM recipeData r
+            LEFT JOIN MaterialData m ON r.SiloNo = m.SiloNo
+            WHERE r.Category = ?
+        """
+
+        df = pd.read_sql_query(query, conn, params=(category,))
+
+        if df.empty:
+            return jsonify({"success": False, "error": "No data found for this recipe"}), 400
+
+        # Create Excel in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name=category[:31])
+
+        output.seek(0)
+
+        filename = f"{category}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    except Exception as e:
+        print("❌ Export Recipe Error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/recipes/import", methods=["POST"])
+def import_recipe_excel():
+    try:
+        if "file" not in request.files:
+            return jsonify({"success": False, "error": "No file uploaded"}), 400
+
+        file = request.files["file"]
+        filename = file.filename
+
+        if not filename.endswith(".xlsx"):
+            return jsonify({"success": False, "error": "Only .xlsx allowed"}), 400
+
+        # Category = file name without extension
+        category = filename.rsplit(".", 1)[0].strip()
+
+        # Load Excel into pandas
+        df = pd.read_excel(file)
+
+        required_cols = ["SiloNo", "MaterialName", "SetWeight", "FineWeight", "Tolerance"]
+
+        for col in required_cols:
+            if col not in df.columns:
+                return jsonify({"success": False, "error": f"Missing column: {col}"}), 400
+
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+        # 1️⃣ Check if recipe already exists
+        cursorRead.execute("SELECT COUNT(*) FROM recipes WHERE name = ?", (category,))
+        if cursorRead.fetchone()[0] > 0:
+            return jsonify({"success": False, "error": "Recipe already exists"}), 409
+
+        # 2️⃣ Insert recipe name
+        cursorWrite.execute(
+            "INSERT INTO recipes (name, category) VALUES (?, ?)",
+            (category, category)
+        )
+        conn.commit()
+
+        # 3️⃣ Insert all rows into recipeData
+        for _, row in df.iterrows():
+            silo = str(row["SiloNo"]).strip()
+
+            # Validate silo exists in MaterialData
+            cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo=?", (silo,))
+            mr = cursorRead.fetchone()
+
+            if not mr:
+                conn.rollback()
+                return jsonify({"success": False, "error": f"Silo not found: {silo}"}), 400
+
+            cursorWrite.execute("""
+                INSERT INTO recipeData (SiloNo, MaterialName, SetWeight, FineWeight, Tolerance, Category)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                silo,
+                mr[0],                              # MaterialName from MaterialData
+                row["SetWeight"],
+                row["FineWeight"],
+                row["Tolerance"],
+                category
+            ))
+
+        conn.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print("❌ Import Error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/recipes_data/update_row/<int:index>", methods=["PUT"])
 def update_row(index):
     data = request.json
+
     silo = data.get("SiloNo")
+    category = data.get("Category")
+    set_weight = data.get("SetWeight")
+    fine_weight = data.get("FineWeight")
+    tolerance = data.get("Tolerance")
+
+    # ------------------------------
+    # Validate required fields
+    # ------------------------------
+    if not silo or not category:
+        return jsonify({"success": False, "error": "SiloNo and Category required"}), 400
+
+    silo = str(silo).strip()
+    category = category.strip()
+
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-    cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo=?", (silo,))
+
+    # --------------------------------------------------------------
+    # 1️⃣ Check if Silo exists in MaterialData
+    # --------------------------------------------------------------
+    cursorRead.execute("SELECT MaterialName FROM MaterialData WHERE SiloNo = ?", (silo,))
     mrow = cursorRead.fetchone()
+
     if not mrow:
         conn.close()
-        return jsonify({"success": False, "error": "silo_not_found"}), 400
+        return jsonify({"success": False, "error": "silo_not_found"}), 404
+
     material_name = mrow[0]
-    cursorWrite.execute("""
-        UPDATE recipeData
-        SET SiloNo=?, MaterialName=?, SetWeight=?, FineWeight=?, Tolerance=?
-        WHERE "Index"=?
-    """, (silo, material_name, data.get("SetWeight"), data.get("FineWeight"), data.get("Tolerance"), index))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+
+    # --------------------------------------------------------------
+    # 2️⃣ Check that Index exists in recipeData
+    # --------------------------------------------------------------
+    cursorRead.execute('SELECT COUNT(*) FROM recipeData WHERE "Index"=?', (index,))
+    if cursorRead.fetchone()[0] == 0:
+        conn.close()
+        return jsonify({"success": False, "error": "row_not_found"}), 404
+
+    # --------------------------------------------------------------
+    # 3️⃣ Duplicate Silo check (same recipe & category)
+    # --------------------------------------------------------------
+    cursorRead.execute("""
+        SELECT COUNT(*) FROM recipeData
+        WHERE SiloNo = ?
+          AND Category = ?
+          AND "Index" != ?
+    """, (silo, category, index))
+
+    if cursorRead.fetchone()[0] > 0:
+        conn.close()
+        return jsonify({"success": False, "error": "silo_already_exists"}), 409
+
+    # --------------------------------------------------------------
+    # 4️⃣ Perform the UPDATE
+    # --------------------------------------------------------------
+    try:
+        cursorWrite.execute("""
+            UPDATE recipeData
+            SET SiloNo = ?, 
+                Category = ?, 
+                MaterialName = ?, 
+                SetWeight = ?, 
+                FineWeight = ?, 
+                Tolerance = ?
+            WHERE "Index" = ?
+        """, (
+            silo,
+            category,
+            material_name,
+            set_weight,
+            fine_weight,
+            tolerance,
+            index
+        ))
+
+        conn.commit()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        conn.rollback()
+        print("❌ Update row error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    finally:
+        conn.close()
+
 
 @app.route("/api/recipes_data/delete_row/<int:index>", methods=["DELETE"])
 def delete_row(index):
@@ -580,26 +864,30 @@ def plc_data_analytics():
     except Exception as e:
         print(f"❌ Error in /api/plc_data_analytics: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-
+    
 @app.route("/api/analytics/dash", methods=["GET"])
 def analytics_dashboard():
     try:
         print("🚀 Starting Dashboard...")
 
-        # Start Dash in a NON-daemon thread
+        # Start Dash in a non-daemon thread
         thread = threading.Thread(target=analytics_module.run_dashboard)
         thread.daemon = False
         thread.start()
 
-        # Open dashboard automatically in browser
-        webbrowser.open("http://127.0.0.1:8050", new=2)
+        # Detect server/public IP automatically
+        server_host = request.host.split(":")[0]
 
-        # Return success to frontend
-        return jsonify({"success": True})
+        # Dash always runs on port 8050
+        dash_url = f"http://{server_host}:8050"
+
+        return jsonify({"success": True, "url": dash_url})
 
     except Exception as e:
         print("❌ Dashboard failed:", e)
         return jsonify({"success": False, "error": str(e)})
+
+
 
     
 @app.route('/api/analytics/graph/data', methods=['GET', 'POST'])
@@ -647,11 +935,20 @@ def analytics_tab(tab):
 
 @app.route('/settings')
 def settings():
-    return render_template('settings.html')
+    user_logged_in = 'username' in session
+
+
+    return render_template(
+        "settings.html",
+        user_logged_in=user_logged_in
+    )
+
+
+def is_admin():
+    return session.get("role") in ["admin", "superadmin"]
 
 @app.route('/stocks')
 def stocks():
-    use
     return render_template('stocks.html')
 
 # ✅ API Route — returns live data for the Stocks table
@@ -707,13 +1004,29 @@ def get_stocks_data():
 def add_stock():
     try:
         data = request.get_json()
+        silono = data["SiloNo"]
+
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+        # ❗ Check if SiloNo already exists
+        cursorRead.execute("SELECT 1 FROM MaterialData WHERE SiloNo = ?", (silono,))
+        exists = cursorRead.fetchone()
+
+        if exists:
+            return jsonify({
+                "success": False,
+                "error": f"SiloNo {silono} already exists. Please use another."
+            })
+
+        # Insert new row
         cursorWrite.execute("""
             INSERT INTO MaterialData (SiloNo, MaterialName, MaterialCode, OperatorName)
             VALUES (?, ?, ?, ?)
         """, (data["SiloNo"], data["MaterialName"], data["MaterialCode"], data["OperatorName"]))
+        
         conn.commit()
         return jsonify({"success": True})
+
     except Exception as e:
         print("Add Error:", e)
         return jsonify({"success": False, "error": str(e)})
@@ -723,14 +1036,31 @@ def add_stock():
 def update_stock(silono):
     try:
         data = request.get_json()
+        new_silono = data.get("SiloNo", silono)
+
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+        # ❗ If SiloNo is being changed, ensure it is unique
+        if new_silono:
+            cursorRead.execute("SELECT 1 FROM MaterialData WHERE SiloNo = ?", (new_silono,))
+            exists = cursorRead.fetchone()
+
+            if exists:
+                return jsonify({
+                    "success": False,
+                    "error": f"SiloNo {new_silono} already exists. Please use another."
+                })
+
+        # Update record
         cursorWrite.execute("""
             UPDATE MaterialData
-            SET MaterialName = ?, MaterialCode = ?, OperatorName = ?
+            SET SiloNo = ?, MaterialName = ?, MaterialCode = ?, OperatorName = ?
             WHERE SiloNo = ?
-        """, (data["MaterialName"], data["MaterialCode"], data["OperatorName"], silono))
+        """, (new_silono, data["MaterialName"], data["MaterialCode"], data["OperatorName"], silono))
+
         conn.commit()
         return jsonify({"success": True})
+
     except Exception as e:
         print("Update Error:", e)
         return jsonify({"success": False, "error": str(e)})
@@ -749,6 +1079,43 @@ def delete_stock(silono):
 
     finally:
         conn.close()
+
+@app.route('/api/stocks/export', methods=['POST'])
+def export_material_data():
+    try:
+        print("📤 MaterialData Excel Export Requested")
+
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+        # Read table into pandas
+        query = """
+            SELECT SiloNo, MaterialName, MaterialCode, OperatorName, TotalExtracted
+            FROM MaterialData
+        """
+        df = pd.read_sql_query(query, conn)
+
+        if df is None or df.empty:
+            return jsonify({"success": False, "error": "No data available to export"}), 400
+
+        # Prepare Excel in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='MaterialData')
+
+        output.seek(0)
+
+        filename = f"MaterialData_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    except Exception as e:
+        print("❌ Export Error:", e)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/about')
@@ -882,4 +1249,4 @@ def inject_user():
 
 if __name__ == '__main__':
     # Timer(1, open_browser).start()
-    app.run(debug=True)
+    app.run()

@@ -18,13 +18,13 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-rows = 5
-columns = 20
-sides = ['A', 'B']
-search_order = [f"{r:02}{c:02}{s}" for c, r, s in product(range(1, columns + 1), range(1, rows + 1), sides)]
+# rows = 5
+# columns = 20
+# sides = ['A', 'B']
+# search_order = [f"{r:02}{c:02}{s}" for c, r, s in product(range(1, columns + 1), range(1, rows + 1), sides)]
 
-latest_data = {}
-retrieval_cancelled = False
+# latest_data = {}
+# retrieval_cancelled = False
 
 # def get_latest_data():
 #     return latest_data

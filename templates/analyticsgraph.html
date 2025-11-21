@@ -31,24 +31,28 @@
   <div class="lower" id="graphPer"></div>
 </div>
 
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-  /** ☑️ FORCE PURE WHITE BACKGROUND FOR ALL CHARTS **/
+  /***************************************
+   * FORCE WHITE BACKGROUND
+   ***************************************/
   Chart.register({
     id: "whiteBackground",
     beforeDraw: (chart) => {
       const ctx = chart.canvas.getContext("2d");
       ctx.save();
-      ctx.fillStyle = "#ffffff";  // PURE WHITE
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, chart.width, chart.height);
       ctx.restore();
     }
   });
 
+  /***************************************
+   * ELEMENTS
+   ***************************************/
   const hourSelect = document.getElementById("hourSelect");
   const fromDate = document.getElementById("fromDate");
   const toDate = document.getElementById("toDate");
@@ -63,6 +67,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let chartKg, chartPer;
 
+  /***************************************
+   * RESTORE SESSION (Chart + Filters)
+   ***************************************/
+  function restoreGraphSession() {
+    const savedFilters = JSON.parse(localStorage.getItem("analytics_graph_filters"));
+    const savedCategories = JSON.parse(localStorage.getItem("analytics_graph_categories"));
+    const savedErrorKg = JSON.parse(localStorage.getItem("analytics_graph_errorKg"));
+    const savedErrorPer = JSON.parse(localStorage.getItem("analytics_graph_errorPer"));
+    const savedTotalKg = localStorage.getItem("analytics_graph_totalKg");
+    const savedTotalPer = localStorage.getItem("analytics_graph_totalPer");
+
+    if (savedFilters) {
+      hourSelect.value = savedFilters.hours;
+      fromDate.value = savedFilters.from_time;
+      toDate.value = savedFilters.to_time;
+    }
+
+    if (savedCategories && savedErrorKg && savedErrorPer) {
+      rebuildCharts(savedCategories, savedErrorKg, savedErrorPer);
+
+      totalKg.textContent = `Total Loss (in Kg): ${savedTotalKg}`;
+      totalPer.textContent = `Total Loss (in %): ${savedTotalPer}`;
+    }
+  }
+
+  restoreGraphSession();
+
+  /***************************************
+   * VIEW BUTTON → FETCH DATA + SAVE SESSION
+   ***************************************/
   viewBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
@@ -90,10 +124,34 @@ document.addEventListener("DOMContentLoaded", () => {
     const errorKg = data.map(d => d["Error_Kg"]);
     const errorPer = data.map(d => d["Error_%"]);
 
+    rebuildCharts(categories, errorKg, errorPer);
+
+    totalKg.textContent = `Total Loss (in Kg): ${result.total_error_kg}`;
+    totalPer.textContent = `Total Loss (in %): ${result.total_error_per}`;
+
+    /***************************************
+     * SAVE SESSION DATA
+     ***************************************/
+    localStorage.setItem("analytics_graph_filters",
+      JSON.stringify({ hours, from_time, to_time })
+    );
+
+    localStorage.setItem("analytics_graph_categories", JSON.stringify(categories));
+    localStorage.setItem("analytics_graph_errorKg", JSON.stringify(errorKg));
+    localStorage.setItem("analytics_graph_errorPer", JSON.stringify(errorPer));
+    localStorage.setItem("analytics_graph_totalKg", result.total_error_kg);
+    localStorage.setItem("analytics_graph_totalPer", result.total_error_per);
+  });
+
+  /***************************************
+   * REBUILD CHARTS FUNCTION
+   ***************************************/
+  function rebuildCharts(categories, errorKg, errorPer) {
+
     if (chartKg) chartKg.destroy();
     if (chartPer) chartPer.destroy();
 
-    // ====================== BLUE KG CHART ======================
+    // KG Chart
     chartKg = new Chart(ctxKg, {
       type: "bar",
       data: {
@@ -107,18 +165,11 @@ document.addEventListener("DOMContentLoaded", () => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          title: { display: true, text: "Total Error (Kg) per Silo", color: "#000" },
-          legend: { display: false }
-        },
-        scales: {
-          x: { title: { display: true, text: "Category" } },
-          y: { title: { display: true, text: "Error (Kg)" } }
-        }
+        plugins: { title: { display: true, text: "Total Error (Kg) per Silo" } }
       }
     });
 
-    // ====================== BLUE % CHART ======================
+    // PERCENT Chart
     chartPer = new Chart(ctxPer, {
       type: "bar",
       data: {
@@ -132,20 +183,11 @@ document.addEventListener("DOMContentLoaded", () => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          title: { display: true, text: "Total Error (%) per Silo", color: "#000" },
-          legend: { display: false }
-        },
-        scales: {
-          x: { title: { display: true, text: "Category" } },
-          y: { title: { display: true, text: "Error (%)" } }
-        }
+        plugins: { title: { display: true, text: "Total Error (%) per Silo" } }
       }
     });
+  }
 
-    totalKg.textContent = `Total Loss (in Kg): ${result.total_error_kg}`;
-    totalPer.textContent = `Total Loss (in %): ${result.total_error_per}`;
-  });
 });
 </script>
 

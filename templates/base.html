@@ -56,17 +56,20 @@
                 <li class="{% if request.path == url_for('logs') %}active{% endif %}">
                     <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
                 </li>
+                <li class="{% if request.path == url_for('about') %}active{% endif %}">
+                    <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
+                </li>
                 {% if user == 'superadmin' %}
                 <li class="{% if request.path == url_for('super_admin') %}active{% endif %}">
                     <a href="{{ url_for('super_admin') }}"><i class="bx bxs-user-rectangle"></i> User Management</a>
                 </li>
                 {% endif %}
-                <li class="{% if request.path == url_for('about') %}active{% endif %}">
-                    <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
-                </li>
+                
+                {% if user in ['admin', 'superadmin'] %}
                 <li class="{% if request.path == url_for('settings') %}active{% endif %}">
                     <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
                 </li>
+                {% endif %}
             </ul>
         </div>
 

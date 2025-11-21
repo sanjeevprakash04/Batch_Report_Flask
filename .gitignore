@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.db
+PLCDB2.db
 
 # C extensions
 *.so
@@ -60,8 +62,7 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-batch_report.db
-*.db
+
 
 # Flask stuff:
 instance/

@@ -1,5 +1,6 @@
 {% extends 'analytics.html' %}
 {% block analytics_dataview %}
+
 <!-- ===============================
       ANALYTICS HEADER
 =============================== -->
@@ -73,8 +74,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const fromDate = document.getElementById("fromDate");
   const toDate = document.getElementById("toDate");
   const totalLabel = document.getElementById("totalLabel");
-  const tableHead = document.querySelector("#reportTable thead");
-  const tableBody = document.querySelector("#reportTable tbody");
+  const table = document.getElementById("reportTable");
+  const tableHead = table.querySelector("thead");
+  const tableBody = table.querySelector("tbody");
   const viewBtn = document.getElementById("viewBtn");
   const exportBtn = document.getElementById("exportBtn");
   const analyticsBtn = document.getElementById("analyticsBtn");
@@ -85,25 +87,119 @@ document.addEventListener("DOMContentLoaded", () => {
   const popupTableBody = document.querySelector("#popupTable tbody");
   const closePopup = document.getElementById("closePopup");
 
-  // ✅ Fetch and display main report
+  // -------------------------------------------------------------------
+  // 🔥 1️⃣ Auto-select Custom when selecting From / To
+  // -------------------------------------------------------------------
+  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+  toDate.addEventListener("click", () => hourSelect.value = "Custom");
+
+  // -------------------------------------------------------------------
+  // 🔥 2️⃣ Clear From/To when dropdown ≠ Custom
+  // -------------------------------------------------------------------
+  hourSelect.addEventListener("change", () => {
+    if (hourSelect.value !== "Custom") {
+      fromDate.value = "";
+      toDate.value = "";
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // 🔥 Restore Analytics session
+  // -------------------------------------------------------------------
+  function restoreAnalyticsSession() {
+    const savedFilters = JSON.parse(localStorage.getItem("analytics_filters"));
+    const savedTable = JSON.parse(localStorage.getItem("analytics_table"));
+    const savedTotal = localStorage.getItem("analytics_total");
+
+    if (savedFilters) {
+      hourSelect.value = savedFilters.hours;
+      fromDate.value = savedFilters.from_time;
+      toDate.value = savedFilters.to_time;
+    }
+
+    if (savedTable && savedTable.length > 0) {
+      renderTable(savedTable);
+      totalLabel.textContent = `Total Batch Weight (in Tons): ${savedTotal}`;
+    }
+  }
+
+  restoreAnalyticsSession();
+
+  // -------------------------------------------------------------------
+  // 🔥 Render Table + Sorting + Row Click
+  // -------------------------------------------------------------------
+  function renderTable(data) {
+    const requiredColumns = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"];
+    const columns = requiredColumns.filter(col => col in data[0]);
+
+    // Create header
+    tableHead.innerHTML =
+      `<tr>${columns.map(col => `<th data-col="${col}" class="sortable">${col}</th>`).join('')}</tr>`;
+
+    // Create body
+    tableBody.innerHTML = "";
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = columns.map(col => `<td>${row[col]}</td>`).join("");
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () =>
+        openPopup(row["Category"], hourSelect.value, fromDate.value, toDate.value)
+      );
+      tableBody.appendChild(tr);
+    });
+
+    activateSorting(data, columns);
+  }
+
+  // -------------------------------------------------------------------
+  // 🔥 3️⃣ Sorting Logic (ASC / DESC)
+  // -------------------------------------------------------------------
+  function activateSorting(data, columns) {
+    const headers = tableHead.querySelectorAll("th");
+
+    headers.forEach(header => {
+      header.addEventListener("click", () => {
+        const col = header.getAttribute("data-col");
+        const asc = header.classList.toggle("asc");
+
+        data.sort((a, b) => {
+          let A = a[col]; 
+          let B = b[col];
+
+          // Numeric sort
+          if (!isNaN(A) && !isNaN(B)) {
+            return asc ? A - B : B - A;
+          }
+
+          // String sort
+          return asc
+            ? String(A).localeCompare(String(B))
+            : String(B).localeCompare(String(A));
+        });
+
+        renderTable(data);
+      });
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // 🔍 View Data → Fetch + Save Session
+  // -------------------------------------------------------------------
   viewBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
     const to_time = toDate.value;
 
-    // Validate custom range
     if (hours === "Custom" && (!from_time || !to_time)) {
       alert("Please select both From and To for Custom range!");
       return;
     }
 
-    // Show loading state
     tableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    tableBody.innerHTML = `<tr><td style="text-align:center;">Loading data...</td></tr>`;
-    totalLabel.textContent = "Total Batch Weight (in Tons): --";
+    tableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
+    totalLabel.textContent = "--";
 
     try {
-      // Call Flask backend
       const res = await fetch("/api/analytics_data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,171 +207,94 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Failed to load data");
+      if (!result.success) throw new Error(result.error);
 
-      const data = result.data || [];
-      if (data.length === 0) {
-        tableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-        tableBody.innerHTML = `<tr><td>No records found for the selected range.</td></tr>`;
-        totalLabel.textContent = "Total Batch Weight (in Tons): 0";
-        return;
-      }
+      const data = result.data;
+      renderTable(data);
 
-      // ✅ Fixed column order
-      const desiredColumns = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"];
-      const availableColumns = desiredColumns.filter(col => col in data[0]);
-
-      // Table headers
-      tableHead.innerHTML = `<tr>${availableColumns.map(col => `<th>${col}</th>`).join('')}</tr>`;
-      tableBody.innerHTML = "";
-
-      // ✅ Populate rows with click event for popup
-      data.forEach(row => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = availableColumns.map(col => `<td>${row[col] ?? ""}</td>`).join("");
-        tr.style.cursor = "pointer";
-        tr.addEventListener("click", () => openPopup(row["Category"], hours, from_time, to_time));
-        tableBody.appendChild(tr);
-      });
-
-      // ✅ Update total label
       totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
 
+      // Save session
+      localStorage.setItem("analytics_filters", JSON.stringify({ hours, from_time, to_time }));
+      localStorage.setItem("analytics_table", JSON.stringify(data));
+      localStorage.setItem("analytics_total", result.total_weight);
+
     } catch (err) {
-      console.error("❌ Error loading analytics data:", err);
       tableHead.innerHTML = `<tr><th>Error</th></tr>`;
       tableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
-      totalLabel.textContent = "Total Batch Weight (in Tons): --";
     }
   });
 
-  // ✅ Export main report as Excel
+  // -------------------------------------------------------------------
+  // Export Analytics
+  // -------------------------------------------------------------------
   exportBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
     const to_time = toDate.value;
 
-    // Validate custom range
     if (hours === "Custom" && (!from_time || !to_time)) {
       alert("Please select both From and To for Custom range!");
       return;
     }
 
-    try {
-      // Send request to Flask endpoint
-      const res = await fetch("/api/export_data_analytics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hours, from_time, to_time })
-      });
+    const res = await fetch("/api/export_data_analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
 
-      if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
 
-      // Convert response to blob
-      const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "AnalyticsReport.xlsx";
+    a.click();
 
-      // Create temporary URL and trigger download
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Report_${hours.replace(" ", "_")}.xlsx`; // ✅ Fixed filename quotes
-      document.body.appendChild(a);
-      a.click();
-
-      // Cleanup
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-    } catch (err) {
-      console.error("❌ Export error:", err);
-      alert("Export failed — check console for details.");
-    }
+    window.URL.revokeObjectURL(url);
   });
 
-  analyticsBtn.addEventListener("click", async () => {
-      console.log("Analytics button clicked!");
-
-      try {
-          // Call Flask endpoint to start the dashboard
-          const res = await fetch("/api/analytics/dash", { method: "GET" });
-          const result = await res.json();
-
-          if (result.success) {
-              // No frontend window.open — backend handles it
-              console.log("Dashboard started successfully");
-              return;
-          } else {
-              alert("Failed to launch analytics dashboard.");
-              console.error("Server error:", result.error);
-          }
-      } catch (err) {
-          console.error("❌ Analytics launch error:", err);
-          alert("Error launching analytics dashboard. Check console for details.");
-      }
-  });
-
-
-
-  // ✅ Popup Function
+  // -------------------------------------------------------------------
+  // Popup Modal
+  // -------------------------------------------------------------------
   async function openPopup(category, hours, from_time, to_time) {
     popup.style.display = "flex";
-    popupTitle.textContent = `PLC Data for: ${category}`;
+    popupTitle.textContent = `Details for: ${category}`;
+
     popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    popupTableBody.innerHTML = `<tr><td>Loading data...</td></tr>`;
+    popupTableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
 
     try {
       const res = await fetch("/api/plc_data_analytics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category,
-          hours,
-          from_time,
-          to_time
-        })
+        body: JSON.stringify({ category, hours, from_time, to_time })
       });
 
       const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Error fetching PLC data");
-
       const data = result.data;
-      if (!data || data.length === 0) {
-        popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-        popupTableBody.innerHTML = `<tr><td>No PLC Data Found</td></tr>`;
-        return;
-      }
 
-      // ✅ Fixed column order
       const cols = [
-        "Category",
-        "SetWeight",
-        "ActualWeight",
-        "FineWeight",
-        "Error_Kg",
-        "Error_%",
-        "DiffPerc",
-        "DiffKg",
-        "TimeStamp"
+        "Category", "SetWeight", "ActualWeight",
+        "FineWeight", "Error_Kg", "Error_%",
+        "DiffPerc", "DiffKg", "TimeStamp"
       ].filter(c => c in data[0]);
 
-      popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
-      popupTableBody.innerHTML = data
-        .map(row => `<tr>${cols.map(c => `<td>${row[c] ?? ""}</td>`).join('')}</tr>`)
-        .join('');
+      popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+      popupTableBody.innerHTML =
+        data.map(row => `<tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>`).join("");
 
     } catch (err) {
-      console.error("❌ Popup fetch error:", err);
       popupTableHead.innerHTML = `<tr><th>Error</th></tr>`;
       popupTableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
     }
   }
 
-  // ✅ Close popup
   closePopup.addEventListener("click", () => popup.style.display = "none");
-
-  
 
 });
 </script>
+
 
 {% endblock %}
