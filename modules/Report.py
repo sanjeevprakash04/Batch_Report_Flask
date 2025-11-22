@@ -1,14 +1,21 @@
+import os
+os.environ["GIO_USE_VFS"] = "local"
+os.environ["GDK_BACKEND"] = "none"
+os.environ["NO_AT_BRIDGE"] = "1"
+os.environ["WEASYPRINT_GUI"] = "false"
 import pandas as pd
 import base64
 from datetime import datetime
 import pdfkit
-import os
+from weasyprint import HTML, CSS
+
 import io
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 import platform
 
-wkhtml_path = '/usr/bin/wkhtmltopdf' if platform.system() == 'Linux' else 'data_files/wkhtmltopdf/bin/wkhtmltopdf.exe'
+# wkhtml_path = '/usr/local/bin/wkhtmltopdf' if platform.system() == 'Linux' else 'data_files/wkhtmltopdf/bin/wkhtmltopdf.exe'
+
 
 # ==========================================================
 # 🔹 Utility Functions
@@ -30,11 +37,58 @@ def encode_logo(logo_path):
 # ==========================================================
 # 🔹 PDF Report Generator
 # ==========================================================
+# def generate_pdf_report(df_pivot, df_string, batch_no):
+#     # logo_base64 = encode_logo("data_files/logo.png")
+#     logo_path = os.path.join("/app", "data_files", "logo.png")
+#     logo_base64 = encode_logo(logo_path)
+
+#     get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] if not df_string[df_string["Name"] == k].empty else "N/A"
+    
+#     details = {
+#         "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
+#         "plant_name": get_value("Plant Name"),
+#         "recipe_name": get_value("Recipe Name"),
+#         "start_time": get_value("Start Date Time"),
+#         "end_time": get_value("End Date Time"),
+#         "batch_no": batch_no
+#     }
+
+#     try:
+#         st = datetime.strptime(details["start_time"], '%Y-%m-%d %H:%M:%S')
+#         ed = datetime.strptime(details["end_time"], '%Y-%m-%d %H:%M:%S')
+#         details["time_taken"] = str(ed - st)
+#     except Exception:
+#         details["time_taken"] = "N/A"
+
+#     details.update({
+#         "total_set_weight": df_pivot["SetWeight"].sum(),
+#         "total_actual_weight": round(df_pivot["ActualWeight"].sum(), 2),
+#     })
+
+#     html = generate_html_report(df_pivot, logo_base64, details)
+
+#     pdf_bytes = pdfkit.from_string(
+#         html,
+#         False,
+#         configuration=pdfkit.configuration(wkhtmltopdf=wkhtml_path),
+#         options={
+#             "enable-local-file-access": "",
+#             "margin-top": "12mm",
+#             "margin-bottom": "12mm",
+#             "margin-left": "12mm",
+#             "margin-right": "12mm",
+#             "encoding": "UTF-8"
+#         }
+#     )
+#     return pdf_bytes
+
 def generate_pdf_report(df_pivot, df_string, batch_no):
+    # Load logo
     logo_base64 = encode_logo("data_files/logo.png")
 
-    get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] if not df_string[df_string["Name"] == k].empty else "N/A"
-    
+    get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] \
+        if not df_string[df_string["Name"] == k].empty else "N/A"
+
     details = {
         "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
         "plant_name": get_value("Plant Name"),
@@ -44,11 +98,12 @@ def generate_pdf_report(df_pivot, df_string, batch_no):
         "batch_no": batch_no
     }
 
+    # Time difference
     try:
         st = datetime.strptime(details["start_time"], '%Y-%m-%d %H:%M:%S')
         ed = datetime.strptime(details["end_time"], '%Y-%m-%d %H:%M:%S')
         details["time_taken"] = str(ed - st)
-    except Exception:
+    except:
         details["time_taken"] = "N/A"
 
     details.update({
@@ -56,21 +111,23 @@ def generate_pdf_report(df_pivot, df_string, batch_no):
         "total_actual_weight": round(df_pivot["ActualWeight"].sum(), 2),
     })
 
+    # Generate HTML
     html = generate_html_report(df_pivot, logo_base64, details)
 
-    pdf_bytes = pdfkit.from_string(
-        html,
-        False,
-        configuration=pdfkit.configuration(wkhtmltopdf=wkhtml_path),
-        options={
-            "enable-local-file-access": "",
-            "margin-top": "12mm",
-            "margin-bottom": "12mm",
-            "margin-left": "12mm",
-            "margin-right": "12mm",
-            "encoding": "UTF-8"
-        }
+    # 🔥 Perfect scaling + A4 + margins (matches 2nd screenshot)
+    pdf_bytes = HTML(string=html).write_pdf(
+        stylesheets=[CSS(string="""
+            @page {
+                size: A4;
+                margin: 6mm;
+            }
+            body {
+                transform: scale(0.86);
+                transform-origin: top center;
+            }
+        """)]
     )
+
     return pdf_bytes
 
 

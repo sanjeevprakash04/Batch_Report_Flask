@@ -10,18 +10,23 @@ Flask-SQLAlchemy
 Flask-WTF
 flask-sock
 getmac
+gunicorn
 numpy
 openpyxl
 pandas
+pdfkit
 plotly
 psycopg2-binary
-gunicorn
 pylogix
 simple-websocket
 SQLAlchemy
 Werkzeug
 wsproto
 XlsxWriter
-pdfkit
 
-
+# PDF generation
+WeasyPrint
+cairosvg
+cairocffi
+tinycss2
+cssselect2
