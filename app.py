@@ -70,7 +70,8 @@ def logs():
 
 @app.route('/recipe')
 def recipe():
-    return render_template('recipe.html')
+    user_logged_in = 'username' in session
+    return render_template('recipe.html',   user_logged_in=user_logged_in)
 
 @app.route("/api/material/<silo_no>", methods=["GET"])
 def get_material_by_silo(silo_no):
@@ -744,6 +745,7 @@ def analytics_data():
         # Calculate total (sum Error_Kg -> convert to tons by dividing 1000)
         total_error_kg = df_diff["Error_Kg"].sum() if "Error_Kg" in df_diff.columns else 0
         total_tons = round(total_error_kg / 1000.0, 2)
+        df_diff["ActualWeight"] = df_diff["ActualWeight"].apply(lambda x: f"{float(x):.2f}")
 
         # Convert to JSON-serializable structure
         data = df_diff.fillna("").to_dict(orient="records")
@@ -949,7 +951,8 @@ def is_admin():
 
 @app.route('/stocks')
 def stocks():
-    return render_template('stocks.html')
+    user_logged_in = 'username' in session
+    return render_template('stocks.html', user_logged_in=user_logged_in)
 
 # ✅ API Route — returns live data for the Stocks table
 @app.route("/api/stocks", methods=["GET"])

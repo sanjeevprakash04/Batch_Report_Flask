@@ -305,6 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ------------------------------
       Popup Logic
 ------------------------------ */
+
   window.openPopup = async function(batchNo) {
 
     popup.style.display = "flex";
@@ -328,18 +329,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const cols = Object.keys(data[0]);
+    // ✔ FIXED COLUMN ORDER
+    const cols = [
+      "SiloNo",
+      "Category",
+      "MaterialName",
+      "SetWeight",
+      "ActualWeight",
+      "Difference",
+      "Tolerance"
+    ];
 
     popupTableHead.innerHTML = `
       <tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>
     `;
 
     popupTableBody.innerHTML = data
-      .map(row => `<tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>`)
+      .map(row => `
+        <tr>
+          ${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}
+        </tr>
+      `)
       .join("");
 
     setTimeout(() => applySorting(popupTableHead, popupTableBody, data), 10);
-
 
     document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
     document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);

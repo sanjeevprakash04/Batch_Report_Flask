@@ -7,8 +7,8 @@
   </div>
 
   <div class="inv-navbar-right">
-    <button class="add-btn" id="addRowBtn">Add</button>
-    <button class="add-btn" id="exportBtn">Export</button>
+    <button class="add-btn" id="addRowBtn"{% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Add</button>
+    <button class="add-btn" id="exportBtn"{% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Export</button>
     <input class="search-input" type="text" id="searchBox" placeholder="Search...">
   </div>
 </div>
@@ -105,8 +105,23 @@ document.addEventListener("DOMContentLoaded", async () => {
           <td>${row.TotalExtracted}</td>
 
           <td class="action-cell">
-            <button class="table-action-btn edit-btn"><i class='bx bx-edit'></i></button>
-            <button class="table-action-btn delete-btn"><i class='bx bx-trash'></i></button>
+
+            <button class="table-action-btn edit-btn"
+              {% if not user_logged_in or user == 'operator' %}
+                disabled title="Access Denied"
+              {% endif %}
+            >
+              <i class='bx bx-edit'></i>
+            </button>
+
+            <button class="table-action-btn delete-btn"
+              {% if not user_logged_in or user == 'operator' %}
+                disabled title="Access Denied"
+              {% endif %}
+            >
+              <i class='bx bx-trash'></i>
+            </button>
+
           </td>
         `;
 

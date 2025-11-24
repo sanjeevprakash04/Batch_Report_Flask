@@ -792,6 +792,11 @@ body {
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.15);
 }
 
+.table-wrapper-analytics {
+  max-height: 75vh;   /* adjust if needed */
+  overflow-y: auto;
+}
+
 .inv-table td {
   padding: 0.7rem 1rem;
   border-bottom: 1px solid #e0e0e0;
@@ -1007,6 +1012,13 @@ body {
   border-color: #007bff;
 }
 
+.add-btn:disabled {
+    background-color: #ccc !important;
+    color: #666 !important;
+    cursor: not-allowed;
+    border: 1px solid #999;
+    opacity: 0.7;
+}
 /* ==============================
    📦 STOCKS TABLE
 ============================== */
@@ -1086,6 +1098,21 @@ body {
 .table-action-btn i {
   font-size: 1.1rem;
   color: #005da2;
+}
+
+.table-action-btn:disabled {
+    background-color: #ccc !important;
+    color: #666 !important;
+    cursor: not-allowed;
+    border: 1px solid #999;
+    opacity: 0.7;
+}
+
+.disabled-icon {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none !important;
+    color: #999 !important;
 }
 
 .save-btn i {
