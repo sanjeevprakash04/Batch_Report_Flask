@@ -867,6 +867,8 @@ def plc_data_analytics():
         print(f"❌ Error in /api/plc_data_analytics: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
     
+import webbrowser
+
 @app.route("/api/analytics/dash", methods=["GET"])
 def analytics_dashboard():
     try:
@@ -877,11 +879,18 @@ def analytics_dashboard():
         thread.daemon = False
         thread.start()
 
-        # Detect server/public IP automatically
+        # Detect host automatically
         server_host = request.host.split(":")[0]
 
         # Dash always runs on port 8050
         dash_url = f"http://{server_host}:8050"
+
+        # 🔥 Open dashboard in default web browser
+        try:
+            webbrowser.open(dash_url)
+            print(f"🌐 Browser opening: {dash_url}")
+        except:
+            print("⚠ Unable to auto-open browser (likely running on server).")
 
         return jsonify({"success": True, "url": dash_url})
 
