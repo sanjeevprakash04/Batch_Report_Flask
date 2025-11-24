@@ -1032,33 +1032,36 @@ def add_stock():
         return jsonify({"success": False, "error": str(e)})
 
 # Update existing stock
-@app.route("/api/stocks/update/<string:silono>", methods=["PUT"])
-def update_stock(silono):
+# Update stock data
+@app.route("/api/stocks/update/<string:old_silono>", methods=["PUT"])
+def update_stock(old_silono):
     try:
         data = request.get_json()
-        new_silono = data.get("SiloNo", silono)
+        new_silono = data["SiloNo"]
 
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
 
-        # ❗ If SiloNo is being changed, ensure it is unique
-        if new_silono:
+        # Step 1: Check if SiloNo changed
+        if old_silono != new_silono:
+            # Step 2: If changed, check if new SiloNo already exists
             cursorRead.execute("SELECT 1 FROM MaterialData WHERE SiloNo = ?", (new_silono,))
             exists = cursorRead.fetchone()
 
             if exists:
                 return jsonify({
                     "success": False,
-                    "error": f"SiloNo {new_silono} already exists. Please use another."
+                    "error": f"SiloNo {new_silono} already exists. Choose another."
                 })
 
-        # Update record
+        # Step 3: Update the row safely
         cursorWrite.execute("""
             UPDATE MaterialData
             SET SiloNo = ?, MaterialName = ?, MaterialCode = ?, OperatorName = ?
             WHERE SiloNo = ?
-        """, (new_silono, data["MaterialName"], data["MaterialCode"], data["OperatorName"], silono))
+        """, (new_silono, data["MaterialName"], data["MaterialCode"], data["OperatorName"], old_silono))
 
         conn.commit()
+
         return jsonify({"success": True})
 
     except Exception as e:

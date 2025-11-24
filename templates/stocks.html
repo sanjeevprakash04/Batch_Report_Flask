@@ -13,7 +13,7 @@
   </div>
 </div>
 
-<!-- Table -->
+<!-- TABLE -->
 <div class="stocks-table-wrapper">
   <table class="stocks-table">
     <thead>
@@ -26,46 +26,41 @@
         <th>Action</th>
       </tr>
     </thead>
+
     <tbody id="stocksTableBody">
-      <tr>
-        <td colspan="5" class="table-error">Loading data...</td>
-      </tr>
+      <tr><td colspan="6" class="table-error">Loading data...</td></tr>
     </tbody>
   </table>
 </div>
 
-<!-- JS -->
+
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
 
   const tableBody = document.getElementById("stocksTableBody");
-  const searchBox = document.getElementById("searchBox");
   const addRowBtn = document.getElementById("addRowBtn");
   const exportBtn = document.getElementById("exportBtn");
+  const searchBox = document.getElementById("searchBox");
 
-  // ---------------------------------------
-  // ✅ SORTING LOGIC ADDED HERE
-  // ---------------------------------------
-  let sortState = {};  // Track ASC/DESC
+  // =========================================================
+  // 🔽 SORTING LOGIC
+  // =========================================================
+  let sortState = {};
 
-  function sortTable(colIndex, isNumeric = false) {
+  function sortTable(colIndex, numeric = false) {
     let rows = Array.from(tableBody.querySelectorAll("tr"));
-
-    // Toggle asc/desc
     sortState[colIndex] = sortState[colIndex] === "asc" ? "desc" : "asc";
 
     rows.sort((a, b) => {
-      let aVal = a.children[colIndex]?.innerText.trim() || "";
-      let bVal = b.children[colIndex]?.innerText.trim() || "";
+      let aVal = a.children[colIndex].innerText.trim();
+      let bVal = b.children[colIndex].innerText.trim();
 
-      if (isNumeric) {
+      if (numeric) {
         aVal = parseFloat(aVal) || 0;
         bVal = parseFloat(bVal) || 0;
       }
 
-      if (sortState[colIndex] === "asc") {
-        return aVal > bVal ? 1 : -1;
-      }
+      if (sortState[colIndex] === "asc") return aVal > bVal ? 1 : -1;
       return aVal < bVal ? 1 : -1;
     });
 
@@ -78,57 +73,207 @@ document.addEventListener("DOMContentLoaded", async () => {
     th.style.cursor = "pointer";
 
     th.addEventListener("click", () => {
-      const numericCols = [4]; // TotalExtracted column
-      sortTable(index, numericCols.includes(index));
+      sortTable(index, index === 4);
     });
   });
 
-  // ---------------------------------------
-  // END SORTING LOGIC
-  // ---------------------------------------
 
-
-  // ✅ Load all stock records
+  // =========================================================
+  // 🔽 LOAD STOCK DATA
+  // =========================================================
   async function loadStocks() {
     try {
       const response = await fetch("/api/stocks");
       const data = await response.json();
+
       tableBody.innerHTML = "";
 
-      if (!data.success || !data.records.length) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="table-error">No records found</td></tr>`;
+      if (!data.success || data.records.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="table-error">No records found</td></tr>`;
         return;
       }
 
-      data.records.forEach((row) => {
+      data.records.forEach(row => {
         const tr = document.createElement("tr");
         tr.dataset.silono = row.SiloNo;
 
         tr.innerHTML = `
-          <td>${row.SiloNo || "-"}</td>
-          <td>${row.MaterialName || "-"}</td>
-          <td>${row.MaterialCode || "-"}</td>
-          <td>${row.OperatorName || "-"}</td>
-          <td>${row.TotalExtracted || "0"}</td>
+          <td>${row.SiloNo}</td>
+          <td>${row.MaterialName}</td>
+          <td>${row.MaterialCode}</td>
+          <td>${row.OperatorName}</td>
+          <td>${row.TotalExtracted}</td>
+
           <td class="action-cell">
-            <button class="table-action-btn edit-btn" title="Edit"><i class='bx bx-edit'></i></button>
-            <button class="table-action-btn delete-btn" title="Delete"><i class='bx bx-trash'></i></button>
+            <button class="table-action-btn edit-btn"><i class='bx bx-edit'></i></button>
+            <button class="table-action-btn delete-btn"><i class='bx bx-trash'></i></button>
           </td>
         `;
+
         tableBody.appendChild(tr);
       });
+
     } catch (err) {
-      console.error("❌ Failed to load:", err);
-      tableBody.innerHTML = `<tr><td colspan="5" class="table-error">Failed to load data</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="6" class="table-error">Failed to load data</td></tr>`;
     }
   }
 
-  // (ALL YOUR EXISTING CODE BELOW — unchanged)
-  // -------------------------------------------------------
-  // ADD, EDIT, DELETE, SEARCH, EXPORT — unchanged
-  // -------------------------------------------------------
 
-  // … [same code as your original after sorting block]
+  // =========================================================
+  // ➕ ADD NEW ROW
+  // =========================================================
+  addRowBtn.addEventListener("click", () => {
+
+    if (document.querySelector(".new-row")) return;
+
+    const tr = document.createElement("tr");
+    tr.classList.add("new-row");
+
+    tr.innerHTML = `
+      <td><input type="text" class="edit-input" placeholder="Silo No"></td>
+      <td><input type="text" class="edit-input" placeholder="Material Name"></td>
+      <td><input type="text" class="edit-input" placeholder="Material Code"></td>
+      <td><input type="text" class="edit-input" placeholder="Operator Name"></td>
+      <td><input type="text" class="edit-input" value="0" disabled></td>
+
+      <td>
+        <button class="table-action-btn save-new-btn"><i class='bx bx-check'></i></button>
+        <button class="table-action-btn cancel-new-btn"><i class='bx bx-x'></i></button>
+      </td>
+    `;
+
+    tableBody.prepend(tr);
+
+    tr.querySelector(".cancel-new-btn").onclick = () => tr.remove();
+
+    tr.querySelector(".save-new-btn").onclick = async () => {
+
+      const inputs = tr.querySelectorAll("input");
+      const newData = {
+        SiloNo: inputs[0].value.trim(),
+        MaterialName: inputs[1].value.trim(),
+        MaterialCode: inputs[2].value.trim(),
+        OperatorName: inputs[3].value.trim()
+      };
+
+      if (!newData.SiloNo || !newData.MaterialName) {
+        alert("Fill required fields.");
+        return;
+      }
+
+      const res = await fetch("/api/stocks/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newData)
+      });
+
+      const result = await res.json();
+      if (result.success) loadStocks();
+      else alert(result.error);
+    };
+  });
+
+
+  // =========================================================
+  // ✏️ EDIT / DELETE ROWS
+  // =========================================================
+  tableBody.addEventListener("click", async (e) => {
+
+    // EDIT
+    const editBtn = e.target.closest(".edit-btn");
+    if (editBtn) {
+      const row = editBtn.closest("tr");
+      if (row.classList.contains("editing")) return;
+      row.classList.add("editing");
+
+      const cols = row.querySelectorAll("td");
+      const siloNo = row.dataset.silono;
+
+      for (let i = 0; i < 5; i++) {
+        const val = cols[i].innerText.trim();
+        if (i === 4) cols[i].innerHTML = `<input disabled class="edit-input" value="${val}">`;
+        else cols[i].innerHTML = `<input class="edit-input" value="${val}">`;
+      }
+
+      cols[5].innerHTML = `
+        <button class="table-action-btn save-btn"><i class='bx bx-check'></i></button>
+        <button class="table-action-btn cancel-btn"><i class='bx bx-x'></i></button>
+      `;
+
+      cols[5].querySelector(".cancel-btn").onclick = () => loadStocks();
+
+      cols[5].querySelector(".save-btn").onclick = async () => {
+        const inputs = row.querySelectorAll("input");
+
+        const updated = {
+          SiloNo: inputs[0].value.trim(),
+          MaterialName: inputs[1].value.trim(),
+          MaterialCode: inputs[2].value.trim(),
+          OperatorName: inputs[3].value.trim()
+        };
+
+        const res = await fetch(`/api/stocks/update/${siloNo}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updated)
+        });
+
+        const result = await res.json();
+        if (result.success) loadStocks();
+        else alert(result.error);
+      };
+    }
+
+    // DELETE
+    const deleteBtn = e.target.closest(".delete-btn");
+
+    if (deleteBtn) {
+      const row = deleteBtn.closest("tr");
+      const siloNo = row.dataset.silono;
+
+      if (!confirm(`Delete Silo ${siloNo}?`)) return;
+
+      const res = await fetch(`/api/stocks/delete/${siloNo}`, {
+        method: "DELETE"
+      });
+
+      const result = await res.json();
+      if (result.success) row.remove();
+      else alert(result.error);
+    }
+  });
+
+
+  // =========================================================
+  // 🔍 SEARCH FILTER
+  // =========================================================
+  searchBox.addEventListener("input", () => {
+    const filter = searchBox.value.toLowerCase();
+    Array.from(tableBody.querySelectorAll("tr")).forEach((row) => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(filter) ? "" : "none";
+    });
+  });
+
+
+  // =========================================================
+  // 📁 EXPORT EXCEL
+  // =========================================================
+  exportBtn.addEventListener("click", async () => {
+    const res = await fetch("/api/stocks/export", {
+      method: "POST"
+    });
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "MaterialData.xlsx";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  });
 
   loadStocks();
 });
