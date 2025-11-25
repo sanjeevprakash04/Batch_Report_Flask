@@ -49,7 +49,7 @@
                 <li class="{% if request.path == url_for('stocks') %}active{% endif %}">
                     <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
                 </li>
-                <li class="{% if request.path == url_for('analytics') %}active{% endif %}">
+                <li class="{% if '/analytics' in request.path %}active{% endif %}">
                     <a href="{{ url_for('analytics') }}"><i class="bx bx-bar-chart-alt-2"></i> Analytics</a>
                 </li>
 

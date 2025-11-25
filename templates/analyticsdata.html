@@ -65,7 +65,7 @@
 </div>
 
 <!-- ===============================
-      FRONTEND SCRIPT
+      SCRIPT
 =============================== -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -73,12 +73,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const hourSelect = document.getElementById("hourSelect");
   const fromDate = document.getElementById("fromDate");
   const toDate = document.getElementById("toDate");
-  const totalLabel = document.getElementById("totalLabel");
-  const tableHead = document.querySelector("#reportTable thead");
-  const tableBody = document.querySelector("#reportTable tbody");
   const viewBtn = document.getElementById("viewBtn");
   const exportBtn = document.getElementById("exportBtn");
   const analyticsBtn = document.getElementById("analyticsBtn");
+  const totalLabel = document.getElementById("totalLabel");
+
+  const tableHead = document.querySelector("#reportTable thead");
+  const tableBody = document.querySelector("#reportTable tbody");
 
   const popup = document.getElementById("popupModal");
   const popupTitle = document.getElementById("popupTitle");
@@ -86,9 +87,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const popupTableBody = document.querySelector("#popupTable tbody");
   const closePopup = document.getElementById("closePopup");
 
-  /* =========================================================
-        MAIN REPORT VIEW
-  ========================================================= */
+  /* ======================================================
+      ✔ DISABLE FUTURE DATES + AUTO SELECT CUSTOM
+  ====================================================== */
+  const now = new Date().toISOString().slice(0, 16);
+  fromDate.max = now;
+  toDate.max = now;
+
+  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+  toDate.addEventListener("click", () => hourSelect.value = "Custom");
+
+  hourSelect.addEventListener("change", () => {
+    if (hourSelect.value !== "Custom") {
+      fromDate.value = "";
+      toDate.value = "";
+    }
+  });
+
+  /* ======================================================
+      ✔ RESTORE SESSION STORAGE
+  ====================================================== */
+  function restoreSession() {
+    const filters = JSON.parse(sessionStorage.getItem("analytics_filters"));
+    const tableData = JSON.parse(sessionStorage.getItem("analytics_table"));
+    const savedTotal = sessionStorage.getItem("analytics_total");
+
+    if (filters) {
+      hourSelect.value = filters.hours;
+      fromDate.value = filters.from_time;
+      toDate.value = filters.to_time;
+    }
+
+    if (tableData) {
+      renderTable(tableData);
+      totalLabel.textContent = "Total Batch Weight (in Tons): " + savedTotal;
+    }
+  }
+  restoreSession();
+
+  /* ======================================================
+      VIEW BUTTON
+  ====================================================== */
   viewBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
@@ -100,157 +139,125 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     tableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    tableBody.innerHTML = `<tr><td style="text-align:center;">Loading data...</td></tr>`;
-    totalLabel.textContent = "Total Batch Weight (in Tons): --";
+    tableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
 
-    try {
-      const res = await fetch("/api/analytics_data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hours, from_time, to_time })
-      });
+    const res = await fetch("/api/analytics_data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
 
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Failed to load data");
+    const result = await res.json();
+    if (!result.success) return;
 
-      const data = result.data;
-      if (!data || data.length === 0) {
-        tableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-        tableBody.innerHTML = `<tr><td>No records found for selected range.</td></tr>`;
-        totalLabel.textContent = "Total Batch Weight (in Tons): 0";
-        return;
-      }
+    renderTable(result.data);
+    totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
 
-      const desiredColumns = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"];
-      const availableColumns = desiredColumns.filter(c => c in data[0]);
-
-      tableHead.innerHTML = `<tr>${availableColumns.map(c => `<th>${c}</th>`).join("")}</tr>`;
-      tableBody.innerHTML = "";
-
-      data.forEach(row => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = availableColumns.map(c => `<td>${row[c]}</td>`).join("");
-        tr.style.cursor = "pointer";
-        tr.addEventListener("click", () =>
-          openPopup(row["Category"], hours, from_time, to_time)
-        );
-        tableBody.appendChild(tr);
-      });
-
-      totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
-
-    } catch (err) {
-      tableHead.innerHTML = `<tr><th>Error</th></tr>`;
-      tableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
-    }
+    // SAVE SESSION
+    sessionStorage.setItem("analytics_filters", JSON.stringify({ hours, from_time, to_time }));
+    sessionStorage.setItem("analytics_table", JSON.stringify(result.data));
+    sessionStorage.setItem("analytics_total", result.total_weight);
   });
 
-  /* =========================================================
-        EXPORT REPORT
-  ========================================================= */
+  /* ======================================================
+      EXPORT BUTTON
+  ====================================================== */
   exportBtn.addEventListener("click", async () => {
     const hours = hourSelect.value;
     const from_time = fromDate.value;
     const to_time = toDate.value;
 
-    if (hours === "Custom" && (!from_time || !to_time)) {
-      alert("Please select both From and To for Custom range!");
-      return;
-    }
+    const res = await fetch("/api/export_data_analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
 
-    try {
-      const res = await fetch("/api/export_data_analytics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hours, from_time, to_time })
-      });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Analytics_${hours.replace(" ", "_")}.xlsx`;
+    a.click();
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Analytics_${hours.replace(" ", "_")}.xlsx`;
-      a.click();
-
-      URL.revokeObjectURL(url);
-
-    } catch (err) {
-      alert("Export failed!");
-      console.error(err);
-    }
+    URL.revokeObjectURL(url);
   });
 
-  /* =========================================================
-      ✔ UPDATED ANALYTICS DASHBOARD BUTTON
-  ========================================================= */
+  /* ======================================================
+      ANALYTICS DASH
+  ====================================================== */
   analyticsBtn.addEventListener("click", async () => {
-    console.log("Analytics button clicked!");
-
     try {
-      const res = await fetch("/api/analytics/dash", { method: "GET" });
+      const res = await fetch("/api/analytics/dash");
       const result = await res.json();
 
       if (result.success) {
-        console.log("Dashboard started successfully!");
-        return;
+        window.open(result.url, "_blank");
       } else {
-        alert("Failed to launch analytics dashboard.");
-        console.error("Server error:", result.error);
+        alert("Failed to open analytics dashboard.");
       }
     } catch (err) {
-      console.error("❌ Analytics launch error:", err);
-      alert("Error launching analytics dashboard.");
+      alert("Error launching dashboard.");
     }
   });
 
-  /* =========================================================
-        POPUP WINDOW
-  ========================================================= */
-  async function openPopup(category, hours, from_time, to_time) {
+  /* ======================================================
+      RENDER MAIN TABLE
+  ====================================================== */
+  function renderTable(data) {
+    const cols = Object.keys(data[0]);
+
+    tableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+    tableBody.innerHTML = "";
+
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = cols.map(c => `<td>${row[c]}</td>`).join("");
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", () => openPopup(row["Category"]));
+      tableBody.appendChild(tr);
+    });
+  }
+
+  /* ======================================================
+      POPUP WINDOW
+  ====================================================== */
+  async function openPopup(category) {
     popup.style.display = "flex";
     popupTitle.textContent = `PLC Data for: ${category}`;
+
     popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
-    popupTableBody.innerHTML = `<tr><td>Loading data...</td></tr>`;
+    popupTableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
 
-    try {
-      const res = await fetch("/api/plc_data_analytics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, hours, from_time, to_time })
-      });
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
 
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error);
+    const res = await fetch("/api/plc_data_analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, hours, from_time, to_time })
+    });
 
-      const data = result.data;
-      if (!data || data.length === 0) {
-        popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-        popupTableBody.innerHTML = `<tr><td>No PLC Data Found</td></tr>`;
-        return;
-      }
+    const result = await res.json();
 
-      const cols = [
-        "Category",
-        "SetWeight",
-        "ActualWeight",
-        "FineWeight",
-        "Error_Kg",
-        "Error_%",
-        "DiffPerc",
-        "DiffKg",
-        "TimeStamp"
-      ].filter(c => c in data[0]);
-
-      popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
-      popupTableBody.innerHTML = data
-        .map(row => `<tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>`)
-        .join("");
-
-    } catch (err) {
-      popupTableHead.innerHTML = `<tr><th>Error</th></tr>`;
-      popupTableBody.innerHTML = `<tr><td>${err.message}</td></tr>`;
+    const data = result.data;
+    if (!data || data.length === 0) {
+      popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
+      popupTableBody.innerHTML = `<tr><td>No PLC Data Available</td></tr>`;
+      return;
     }
+
+    const cols = [
+      "Category", "SetWeight", "ActualWeight", "FineWeight",
+      "Error_Kg", "Error_%", "DiffPerc", "DiffKg", "TimeStamp"
+    ].filter(c => c in data[0]);
+
+    popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+    popupTableBody.innerHTML = data
+      .map(row => `<tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>`)
+      .join("");
   }
 
   closePopup.addEventListener("click", () => popup.style.display = "none");
