@@ -206,18 +206,28 @@ document.addEventListener("DOMContentLoaded", () => {
       RENDER MAIN TABLE
   ====================================================== */
   function renderTable(data) {
-    const cols = Object.keys(data[0]);
+    const cols = [
+      "Category",
+      "SetWeight",
+      "ActualWeight",
+      "Error_Kg",
+      "Error_%"
+    ];
 
+    // Table Header
     tableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+
+    // Table Body
     tableBody.innerHTML = "";
 
     data.forEach(row => {
       const tr = document.createElement("tr");
-      tr.innerHTML = cols.map(c => `<td>${row[c]}</td>`).join("");
+      tr.innerHTML = cols.map(c => `<td>${row[c] ?? ""}</td>`).join("");
       tr.style.cursor = "pointer";
       tr.addEventListener("click", () => openPopup(row["Category"]));
       tableBody.appendChild(tr);
     });
+
   }
 
   /* ======================================================
