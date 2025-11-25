@@ -14,7 +14,7 @@ body {
   overflow: hidden;
   font-family: Arial, sans-serif;
 }
-.upper-left, .upper-right, .lower-left, .lower-right {
+.dashboard-content .upper .upper-left, .dashboard-content .upper .upper-right, .dashboard-content .lower .lower-left, .dashboard-content .lower .lower-right {
     display: flex;
     justify-content: center;   /* horizontal center */
     align-items: center;       /* vertical center */
