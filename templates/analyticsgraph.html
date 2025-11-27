@@ -36,9 +36,30 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-  /***************************************
-   * FORCE WHITE BACKGROUND
-   ***************************************/
+  /* ======================================================
+      CLEAR DATE WHEN CUSTOM NOT SELECTED
+     (same logic as your other analytics page)
+  ====================================================== */
+
+  const hourSelect = document.getElementById("hourSelect");
+  const fromDate = document.getElementById("fromDate");
+  const toDate = document.getElementById("toDate");
+
+  // Auto-switch to Custom when user clicks date fields
+  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+  toDate.addEventListener("click", () => hourSelect.value = "Custom");
+
+  // Clear From/To when user selects NON-CUSTOM
+  hourSelect.addEventListener("change", () => {
+    if (hourSelect.value !== "Custom") {
+      fromDate.value = "";
+      toDate.value = "";
+    }
+  });
+
+  /* ======================================================
+      FORCE WHITE BACKGROUND
+  ====================================================== */
   Chart.register({
     id: "whiteBackground",
     beforeDraw: (chart) => {
@@ -50,12 +71,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  /***************************************
-   * ELEMENTS
-   ***************************************/
-  const hourSelect = document.getElementById("hourSelect");
-  const fromDate = document.getElementById("fromDate");
-  const toDate = document.getElementById("toDate");
+  /* ======================================================
+      ELEMENTS
+  ====================================================== */
   const viewBtn = document.getElementById("viewBtnGraph");
   const totalKg = document.getElementById("totalLabelKg");
   const totalPer = document.getElementById("totalLabelPercent");
@@ -67,14 +85,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let chartKg, chartPer;
 
-  /***************************************
-   * RESTORE SESSION (Chart + Filters)
-   ***************************************/
+  /* ======================================================
+      RESTORE SESSION
+  ====================================================== */
   function restoreGraphSession() {
     const savedFilters = JSON.parse(localStorage.getItem("analytics_graph_filters"));
     const savedCategories = JSON.parse(localStorage.getItem("analytics_graph_categories"));
     const savedErrorKg = JSON.parse(localStorage.getItem("analytics_graph_errorKg"));
     const savedErrorPer = JSON.parse(localStorage.getItem("analytics_graph_errorPer"));
+
     const savedTotalKg = localStorage.getItem("analytics_graph_totalKg");
     const savedTotalPer = localStorage.getItem("analytics_graph_totalPer");
 
@@ -86,7 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (savedCategories && savedErrorKg && savedErrorPer) {
       rebuildCharts(savedCategories, savedErrorKg, savedErrorPer);
-
       totalKg.textContent = `Total Loss (in Kg): ${savedTotalKg}`;
       totalPer.textContent = `Total Loss (in %): ${savedTotalPer}`;
     }
@@ -94,13 +112,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   restoreGraphSession();
 
-  /***************************************
-   * VIEW BUTTON → FETCH DATA + SAVE SESSION
-   ***************************************/
+  /* ======================================================
+      VIEW BUTTON — FETCH + SAVE SESSION
+  ====================================================== */
   viewBtn.addEventListener("click", async () => {
+
     const hours = hourSelect.value;
     const from_time = fromDate.value;
     const to_time = toDate.value;
+
+    // Validation — same as your reference page
+    if (hours === "Custom" && (!from_time || !to_time)) {
+      alert("Please select both FROM and TO for Custom range!");
+      return;
+    }
 
     const res = await fetch("/api/analytics/graph/data", {
       method: "POST",
@@ -129,9 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
     totalKg.textContent = `Total Loss (in Kg): ${result.total_error_kg}`;
     totalPer.textContent = `Total Loss (in %): ${result.total_error_per}`;
 
-    /***************************************
-     * SAVE SESSION DATA
-     ***************************************/
+    // Save session
     localStorage.setItem("analytics_graph_filters",
       JSON.stringify({ hours, from_time, to_time })
     );
@@ -143,15 +166,15 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("analytics_graph_totalPer", result.total_error_per);
   });
 
-  /***************************************
-   * REBUILD CHARTS FUNCTION
-   ***************************************/
+
+  /* ======================================================
+      REBUILD CHARTS
+  ====================================================== */
   function rebuildCharts(categories, errorKg, errorPer) {
 
     if (chartKg) chartKg.destroy();
     if (chartPer) chartPer.destroy();
 
-    // KG Chart
     chartKg = new Chart(ctxKg, {
       type: "bar",
       data: {
@@ -169,7 +192,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // PERCENT Chart
     chartPer = new Chart(ctxPer, {
       type: "bar",
       data: {
@@ -190,5 +212,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 </script>
+
 
 {% endblock %}
