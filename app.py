@@ -895,9 +895,6 @@ def analytics_dashboard():
         return jsonify({"success": False, "error": str(e)})
 
 
-
-
-    
 @app.route('/api/analytics/graph/data', methods=['GET', 'POST'])
 def get_analytics_graph_data():
     try:

@@ -6,21 +6,32 @@
     <link rel="icon" type="image/x-icon" href="/static/icons/favicon.png">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/boxicons.min.css') }}">
+
+    <!-- Mobile responsive -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
+
 <body>
+
+    <!-- ============================
+          TOP NAVBAR
+    ============================ -->
     <div class="navbar">
         <div class="navbar-left">
-            <img src="/static/images/skew-logo-horizontal.png" alt="Logo" style="width: 100%; height: 25px;">
+            <span class="mobile-menu-btn">☰</span>
+            <img src="/static/images/skew-logo-horizontal.png" alt="Logo" style="height: 25px;">
         </div>
 
         <div class="navbar-right">
             {% if user %}
                 <div class="avatar" id="avatarBtn">{{ user[0].upper() }}</div>
+
                 <div id="avatarDropdown" class="avatar-dropdown">
                     <div class="avatar-info">
                         <div class="dropdown-avatar">{{ user[0].upper() }}</div>
                         <div class="dropdown-username">{{ user }}</div>
                     </div>
+
                     <div class="avatar-links">
                         {% if user != "superadmin" %}
                         <div id="changePasswordBtn" class="avatar-link">Change Password</div>
@@ -34,21 +45,31 @@
         </div>
     </div>
 
+
+    <!-- ============================
+          MAIN LAYOUT
+    ============================ -->
     <div class="container">
+
+        <!-- Sidebar -->
         <div class="sidebar">
             <ul>
                 <li class="{% if request.path == url_for('dashboard') %}active{% endif %}">
                     <a href="{{ url_for('dashboard') }}"><i class="bx bxs-dashboard"></i> Dashboard</a>
                 </li>
+
                 <li class="{% if request.path == url_for('report') %}active{% endif %}">
                     <a href="{{ url_for('report') }}"><i class="bx bxs-file-archive"></i> Report</a>
                 </li>
+
                 <li class="{% if request.path == url_for('recipe') %}active{% endif %}">
                     <a href="{{ url_for('recipe') }}"><i class="bx bx-atom"></i> Recipe</a>
                 </li>
+
                 <li class="{% if request.path == url_for('stocks') %}active{% endif %}">
                     <a href="{{ url_for('stocks') }}"><i class="bx bxs-box"></i> Stocks</a>
                 </li>
+
                 <li class="{% if '/analytics' in request.path %}active{% endif %}">
                     <a href="{{ url_for('analytics') }}"><i class="bx bx-bar-chart-alt-2"></i> Analytics</a>
                 </li>
@@ -56,15 +77,17 @@
                 <li class="{% if request.path == url_for('logs') %}active{% endif %}">
                     <a href="{{ url_for('logs') }}"><i class="bx bxl-blogger"></i> Logs</a>
                 </li>
+
                 <li class="{% if request.path == url_for('about') %}active{% endif %}">
                     <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
                 </li>
+
                 {% if user == 'superadmin' %}
                 <li class="{% if request.path == url_for('super_admin') %}active{% endif %}">
                     <a href="{{ url_for('super_admin') }}"><i class="bx bxs-user-rectangle"></i> User Management</a>
                 </li>
                 {% endif %}
-                
+
                 {% if user in ['admin', 'superadmin'] %}
                 <li class="{% if request.path == url_for('settings') %}active{% endif %}">
                     <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
@@ -73,131 +96,139 @@
             </ul>
         </div>
 
+        <!-- Sidebar overlay for mobile -->
+        <div class="sidebar-overlay"></div>
+
+        <!-- Main Page Content -->
         <div class="main-content">
             {% block content %}{% endblock %}
         </div>
     </div>
 
-    <!-- 🔒 Change Password Modal -->
+
+    <!-- ============================
+          CHANGE PASSWORD MODAL
+    ============================ -->
     <div id="changePasswordModal" class="pass-modal">
         <div class="pass-modal-content">
             <span class="close" id="closePasswordModal">&times;</span>
+
             <h2>Change Password</h2>
             <form id="changePasswordForm">
                 <div class="form-group">
-                    <label for="oldPassword">Old Password</label>
-                    <input type="password" id="oldPassword" name="oldPassword" required>
+                    <label>Old Password</label>
+                    <input type="password" id="oldPassword" required>
                 </div>
+
                 <div class="form-group">
-                    <label for="newPassword">New Password</label>
-                    <input type="password" id="newPassword" name="newPassword" required>
+                    <label>New Password</label>
+                    <input type="password" id="newPassword" required>
                 </div>
+
                 <div class="form-group">
-                    <label for="confirmPassword">Confirm New Password</label>
-                    <input type="password" id="confirmPassword" name="confirmPassword" required>
+                    <label>Confirm New Password</label>
+                    <input type="password" id="confirmPassword" required>
                 </div>
-                <button type="submit" class="login-btn">Change Password</button>
+
+                <button class="login-btn">Change Password</button>
             </form>
         </div>
     </div>
 
-    <!-- 🔐 Login Modal -->
+
+    <!-- ============================
+          LOGIN MODAL
+    ============================ -->
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <span class="close" id="closeModal">&times;</span>
+
             <form id="loginForm" method="POST">
                 <h2>Welcome</h2>
                 <p>Please login to continue</p>
 
                 <div class="form-group">
-                    <label for="username">Username</label>
+                    <label>Username</label>
                     <input type="text" id="username" name="username" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <label>Password</label>
                     <input type="password" id="password" name="password" required>
                 </div>
 
-                <button type="submit" class="login-btn">Login</button>
+                <button class="login-btn">Login</button>
             </form>
         </div>
     </div>
 
-    <!-- JS: Dropdown -->
+
+    <!-- ============================
+          JAVASCRIPT
+    ============================ -->
+
+    <!-- Avatar dropdown -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const avatarBtn = document.getElementById('avatarBtn');
-            const avatarDropdown = document.getElementById('avatarDropdown');
+            const dropdown = document.getElementById('avatarDropdown');
+
             if (avatarBtn) {
                 avatarBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    avatarDropdown.style.display = avatarDropdown.style.display === 'block' ? 'none' : 'block';
+                    dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";
                 });
             }
-            document.addEventListener('click', () => avatarDropdown && (avatarDropdown.style.display = 'none'));
-            avatarDropdown && avatarDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+            document.addEventListener("click", () => dropdown && (dropdown.style.display = "none"));
         });
     </script>
 
-    <!-- JS: Login Modal -->
+    <!-- Login Modal -->
     <script>
         const loginModal = document.getElementById("loginModal");
         const openLoginBtn = document.getElementById("openLoginBtn");
         const closeLoginBtn = document.getElementById("closeModal");
-        const loginForm = document.getElementById("loginForm");
 
         openLoginBtn && openLoginBtn.addEventListener("click", () => loginModal.style.display = "block");
         closeLoginBtn && closeLoginBtn.addEventListener("click", () => loginModal.style.display = "none");
-        window.onclick = (e) => { if (e.target === loginModal) loginModal.style.display = "none"; };
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const formData = new FormData(loginForm);
-            fetch('/login', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) { window.location.href = '/home'; }
-                else alert(data.error);
-            })
-            .catch(() => alert('Login failed'));
-        });
     </script>
 
-    <!-- JS: Change Password Modal -->
+    <!-- Password Modal -->
     <script>
         const passModal = document.getElementById("changePasswordModal");
         const openPassBtn = document.getElementById("changePasswordBtn");
         const closePassBtn = document.getElementById("closePasswordModal");
-        const passForm = document.getElementById("changePasswordForm");
 
         openPassBtn && openPassBtn.addEventListener("click", () => passModal.style.display = "block");
         closePassBtn && closePassBtn.addEventListener("click", () => passModal.style.display = "none");
-        window.addEventListener("click", (e) => { if (e.target === passModal) passModal.style.display = "none"; });
+    </script>
 
-        passForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const oldPassword = document.getElementById("oldPassword").value;
-            const newPassword = document.getElementById("newPassword").value;
-            const confirmPassword = document.getElementById("confirmPassword").value;
+    <!-- Sidebar Slide In/Out -->
+    <script>
+        const sidebar = document.querySelector(".sidebar");
+        const overlay = document.querySelector(".sidebar-overlay");
+        const menuBtn = document.querySelector(".mobile-menu-btn");
 
-            if (newPassword !== confirmPassword) return alert("New passwords do not match!");
-            if (oldPassword === newPassword) return alert("New password must differ from old.");
+        // Toggle open/close on button click
+        menuBtn.addEventListener("click", () => {
+            const isOpen = sidebar.classList.contains("open");
 
-            fetch('/change_password', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ oldPassword, newPassword })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert("Password changed successfully!");
-                    passModal.style.display = "none";
-                } else alert("Error: " + data.error);
-            })
-            .catch(() => alert("Request failed."));
+            if (isOpen) {
+                sidebar.classList.remove("open");
+                overlay.classList.remove("active");
+            } else {
+                sidebar.classList.add("open");
+                overlay.classList.add("active");
+            }
         });
+
+        // Close when clicking outside
+        overlay.addEventListener("click", () => {
+            sidebar.classList.remove("open");
+            overlay.classList.remove("active");
+        });
+
     </script>
 
 </body>

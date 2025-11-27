@@ -2011,3 +2011,75 @@ th {
     from {transform: translateY(40px); opacity: 0;}
     to {transform: translateY(0); opacity: 1;}
 }
+
+
+/* =========================================
+   ✅ GLOBAL RESPONSIVE TWEAKS
+   (Put this at the *end* of your CSS file)
+========================================= */
+
+/* Tablet + small laptop and below */
+/* ============================
+   📱 MOBILE SLIDING SIDEBAR
+============================ */
+
+@media (max-width: 992px) {
+
+  /* Hide original static sidebar */
+  .sidebar {
+    position: fixed;
+    left: -260px;        /* hidden off-screen */
+    top: 8vh;
+    width: 260px;
+    height: calc(100vh - 8vh);
+    background: white;
+    z-index: 3000;
+    transition: left 0.3s ease-in-out;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+  }
+
+  /* When sidebar is open */
+  .sidebar.open {
+    left: 0;
+  }
+
+  /* Overlay background */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 8vh;
+    left: 0;
+    width: 100%;
+    height: calc(100vh - 8vh);
+    background: rgba(0,0,0,0.4);
+    z-index: 2500;
+  }
+
+  .sidebar-overlay.active {
+    display: block;
+  }
+
+  /* Show hamburger button */
+  .mobile-menu-btn {
+    display: inline-block;
+    font-size: 1.7rem;
+    margin-right: 1rem;
+    cursor: pointer;
+    color: #005da2;
+    font-weight: bold;
+  }
+
+  /* Sidebar items bigger for mobile */
+  .sidebar ul li {
+    padding: 1rem 1.3rem;
+    font-size: 1.1rem;
+  }
+
+}
+
+/* Desktop: hide hamburger button */
+@media (min-width: 993px) {
+  .mobile-menu-btn {
+    display: none;
+  }
+}
