@@ -11,7 +11,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden; 
+  overflow-y: auto;
   font-family: Arial, sans-serif;
 }
 .dashboard-content .upper .upper-left, .dashboard-content .upper .upper-right, .dashboard-content .lower .lower-left, .dashboard-content .lower .lower-right {
@@ -2083,3 +2084,88 @@ th {
     display: none;
   }
 }
+/* =========================================
+   📱 MOBILE FIX – Remove all fixed heights
+========================================= */
+/* =========================================
+   📱 MOBILE FIX – Remove all fixed heights
+========================================= */
+@media (max-width: 992px) {
+
+  body {
+    overflow-y: auto !important;
+    height: auto !important;
+  }
+
+  .container,
+  .main-content,
+  .stocks-content,
+  .settings-content,
+  .analytics-content,
+  .dashboard-content,
+  .about-container,
+  .recipe-content,
+  .logs-content {
+    height: auto !important;
+    min-height: unset !important;
+  }
+
+  /* Remove fixed panel heights */
+  .upper,
+  .lower,
+  .upper-left,
+  .upper-right,
+  .lower-left,
+  .lower-right,
+  .left,
+  .right {
+    height: auto !important;
+  }
+
+  /* Tables scroll naturally */
+  .report-table-wrapper,
+  .stocks-table-wrapper,
+  .inventory-table-wrapper {
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Sidebar overlay layout fix */
+  .main-content {
+    margin-left: 0 !important;
+  }
+}
+
+/* ============================================
+   📱 FIX MOBILE ZOOM — KEEP DESKTOP LOOK
+   (Scale everything smaller on small screens)
+============================================ */
+
+/* ============================================
+   📱 FIX MOBILE ZOOM — KEEP DESKTOP LOOK
+   (Scale everything smaller on small screens)
+============================================ */
+
+@media (max-width: 992px) {
+
+  html {
+    transform: scale(0.44);        /* more zoom-out */
+    transform-origin: top left;
+    width: 230%;                   /* adjust width after scaling */
+    overflow-x: hidden !important;
+  }
+
+  body {
+    overflow-x: hidden !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .sidebar {
+    width: 240px !important;
+  }
+}
+
