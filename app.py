@@ -867,6 +867,62 @@ def plc_data_analytics():
         print(f"❌ Error in /api/plc_data_analytics: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
     
+@app.route("/api/plc_data_analytics_excel", methods=["POST"])
+def plc_data_analytics_EXCEL():
+    try:
+        data = request.get_json() or {}
+
+        # Extract parameters
+        category = data.get("category")
+        hours = data.get("hours", "1 Hr")
+        from_time = data.get("from_time")
+        to_time = data.get("to_time")
+
+        if not category:
+            return jsonify({"success": False, "error": "Missing 'category' field"}), 400
+
+        # DB connections
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        # Fetch PLC data
+        df = sqliteCon.show_data(conn, hours, from_time, to_time, engineConRead)
+        if df is None or df.empty:
+            return jsonify({"success": False, "error": "No PLC data found"}), 404
+
+        # Filter & pivot
+        df = df[df["Category"] != "Info"]
+        df_pivot = sqliteCon.get_silo_pivot(df, category)
+
+        if df_pivot is None or df_pivot.empty:
+            return jsonify({"success": False, "error": "No data available"}), 404
+
+        # Column order
+        col_order = [
+            "Category", "SetWeight", "ActualWeight", "FineWeight",
+            "Error_Kg", "Error_%", "DiffPerc", "DiffKg", "TimeStamp"
+        ]
+        df_pivot = df_pivot[[c for c in col_order if c in df_pivot.columns]]
+
+        # Convert to Excel in memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_pivot.to_excel(writer, index=False, sheet_name=f"{category}")
+
+        output.seek(0)
+
+        filename = f"PLC_Data_{category}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except Exception as e:
+        print(f"❌ Error in /api/plc_data_analytics_EXCEL: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/analytics/dash", methods=["GET"])

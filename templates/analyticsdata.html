@@ -59,6 +59,7 @@
     </div>
 
     <div class="popup-footer">
+      <button id="downloadPopupExcel" class="inv-button success">Download Excel</button>
       <button id="closePopup" class="inv-button warning">Close</button>
     </div>
   </div>
@@ -206,25 +207,35 @@ document.addEventListener("DOMContentLoaded", () => {
       RENDER MAIN TABLE
   ====================================================== */
   function renderTable(data) {
+
     const cols = [
-      "Category",
-      "SetWeight",
-      "ActualWeight",
-      "Error_Kg",
-      "Error_%"
+      { key: "Category", label: "Category" },
+      { key: "SetWeight", label: "Set Weight (Kg)" },
+      { key: "ActualWeight", label: "Actual Weight (Kg)" },
+      { key: "Error_Kg", label: "Error (Kg)" },
+      { key: "Error_%", label: "Error (%)" }
     ];
 
-    // Table Header
-    tableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+    // 🔹 Table Header
+    tableHead.innerHTML = `
+      <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
+    `;
 
-    // Table Body
+    // 🔹 Table Body
     tableBody.innerHTML = "";
 
     data.forEach(row => {
       const tr = document.createElement("tr");
-      tr.innerHTML = cols.map(c => `<td>${row[c] ?? ""}</td>`).join("");
+
+      // Each cell uses c.key (correct!)
+      tr.innerHTML = cols
+        .map(c => `<td>${row[c.key] ?? ""}</td>`)
+        .join("");
+
       tr.style.cursor = "pointer";
+
       tr.addEventListener("click", () => openPopup(row["Category"]));
+
       tableBody.appendChild(tr);
     });
 
@@ -259,18 +270,60 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const cols = [
-      "Category", "SetWeight", "ActualWeight", "FineWeight",
-      "Error_Kg", "Error_%", "DiffPerc", "DiffKg", "TimeStamp"
-    ].filter(c => c in data[0]);
+    const allCols = [
+      { key: "Category", label: "Category" },
+      { key: "SetWeight", label: "Set Weight (Kg)" },
+      { key: "ActualWeight", label: "Actual Weight (Kg)" },
+      { key: "FineWeight", label: "Fine Weight (Kg)" },
+      { key: "Error_Kg", label: "Error (Kg)" },
+      { key: "Error_%", label: "Error (%)" },
+      { key: "DiffPerc", label: "Difference (%)" },
+      { key: "DiffKg", label: "Difference (Kg)" },
+      { key: "TimeStamp", label: "Timestamp" }
+    ];
 
-    popupTableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
-    popupTableBody.innerHTML = data
-      .map(row => `<tr>${cols.map(c => `<td>${row[c]}</td>`).join("")}</tr>`)
-      .join("");
+    // Only keep columns that exist in the data
+    const cols = allCols.filter(col => col.key in data[0]);
+
+    // ---- Header ----
+    popupTableHead.innerHTML =
+      `<tr>${cols.map(col => `<th>${col.label}</th>`).join("")}</tr>`;
+
+    // ---- Body ----
+    popupTableBody.innerHTML =
+      data.map(row =>
+        `<tr>${cols.map(col => `<td>${row[col.key] ?? ""}</td>`).join("")}</tr>`
+      ).join("");
+
   }
+  document.getElementById("downloadPopupExcel").addEventListener("click", async () => {
+
+    const category = popupTitle.textContent.replace("PLC Data for: ", "");
+
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    const res = await fetch("/api/plc_data_analytics_excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, hours, from_time, to_time })
+    });
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `PLC_Data_${category}.xlsx`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  });
 
   closePopup.addEventListener("click", () => popup.style.display = "none");
+
+
 
 });
 </script>

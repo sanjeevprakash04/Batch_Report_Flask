@@ -331,23 +331,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ✔ FIXED COLUMN ORDER
     const cols = [
-      "SiloNo",
-      "Category",
-      "MaterialName",
-      "SetWeight",
-      "ActualWeight",
-      "Difference",
-      "Tolerance"
+      { key: "SiloNo", label: "Silo No" },
+      { key: "Category", label: "Category" },
+      { key: "MaterialName", label: "Material Name" },
+      { key: "SetWeight", label: "Set Weight (Kg)" },
+      { key: "ActualWeight", label: "Actual Weight (Kg)" },
+      { key: "Difference", label: "Difference (Kg)" },
+      { key: "Tolerance", label: "Tolerance (Kg)" }
     ];
 
+
     popupTableHead.innerHTML = `
-      <tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>
+      <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
     `;
 
     popupTableBody.innerHTML = data
       .map(row => `
         <tr>
-          ${cols.map(c => `<td>${row[c] ?? ""}</td>`).join("")}
+          ${cols.map(c => `<td>${row[c.key] ?? ""}</td>`).join("")}
         </tr>
       `)
       .join("");

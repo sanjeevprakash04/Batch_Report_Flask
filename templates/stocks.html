@@ -22,7 +22,7 @@
         <th class="sortable" data-col="1">Raw Material Name</th>
         <th class="sortable" data-col="2">Raw Material Code</th>
         <th class="sortable" data-col="3">Operator Name</th>
-        <th class="sortable" data-col="4">TotalExtracted(kg)</th>
+        <th class="sortable" data-col="4">Total Consumption (Kg)</th>
         <th>Action</th>
       </tr>
     </thead>
@@ -73,8 +73,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     th.style.cursor = "pointer";
 
     th.addEventListener("click", () => {
-      sortTable(index, index === 4);
+      // Column 0 → numeric sort (Silo No)
+      // Column 4 → numeric sort (TotalExtracted)
+      const numericColumns = [0, 4];
+      sortTable(index, numericColumns.includes(index));
     });
+
   });
 
 

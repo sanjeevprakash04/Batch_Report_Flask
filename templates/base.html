@@ -192,6 +192,19 @@
 
         openLoginBtn && openLoginBtn.addEventListener("click", () => loginModal.style.display = "block");
         closeLoginBtn && closeLoginBtn.addEventListener("click", () => loginModal.style.display = "none");
+        window.onclick = (e) => { if (e.target === loginModal) loginModal.style.display = "none"; };
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(loginForm);
+            fetch('/login', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) { window.location.href = '/home'; }
+                else alert(data.error);
+            })
+            .catch(() => alert('Login failed'));
+        });
     </script>
 
     <!-- Password Modal -->
@@ -202,6 +215,31 @@
 
         openPassBtn && openPassBtn.addEventListener("click", () => passModal.style.display = "block");
         closePassBtn && closePassBtn.addEventListener("click", () => passModal.style.display = "none");
+         window.addEventListener("click", (e) => { if (e.target === passModal) passModal.style.display = "none"; });
+
+        passForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const oldPassword = document.getElementById("oldPassword").value;
+            const newPassword = document.getElementById("newPassword").value;
+            const confirmPassword = document.getElementById("confirmPassword").value;
+
+            if (newPassword !== confirmPassword) return alert("New passwords do not match!");
+            if (oldPassword === newPassword) return alert("New password must differ from old.");
+
+            fetch('/change_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ oldPassword, newPassword })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Password changed successfully!");
+                    passModal.style.display = "none";
+                } else alert("Error: " + data.error);
+            })
+            .catch(() => alert("Request failed."));
+        });
     </script>
 
     <!-- Sidebar Slide In/Out -->
