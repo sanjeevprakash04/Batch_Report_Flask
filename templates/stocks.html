@@ -41,13 +41,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const exportBtn = document.getElementById("exportBtn");
   const searchBox = document.getElementById("searchBox");
 
-  /* =============================
-       SORTING LOGIC
-  ============================== */
+  /* =========================================================
+       SORTING LOGIC (FIXED)
+  ========================================================= */
   let sortState = {};
 
   function sortTable(colIndex, numeric = false) {
     let rows = Array.from(tableBody.querySelectorAll("tr"));
+
+    // Toggle sorting direction
     sortState[colIndex] = sortState[colIndex] === "asc" ? "desc" : "asc";
 
     rows.sort((a, b) => {
@@ -59,7 +61,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         bVal = parseFloat(bVal) || 0;
       }
 
-      return sortState[colIndex] === "asc" ? aVal > bVal : aVal < bVal ? 1 : -1;
+      if (sortState[colIndex] === "asc") return aVal > bVal ? 1 : -1;
+      return aVal < bVal ? 1 : -1;
     });
 
     tableBody.innerHTML = "";
@@ -68,17 +71,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.querySelectorAll("th.sortable").forEach((th) => {
     const index = Number(th.dataset.col);
-    th.style.cursor = "pointer";
 
     th.addEventListener("click", () => {
-      const numericColumns = [0, 4];
-      sortTable(index, numericColumns.includes(index));
+      const numericCols = [0, 4];
+      sortTable(index, numericCols.includes(index));
     });
   });
 
-  /* =============================
-      LOAD STOCKS
-  ============================== */
+  /* =========================================================
+       LOAD STOCK DATA
+  ========================================================= */
   async function loadStocks() {
     const response = await fetch("/api/stocks");
     const data = await response.json();
@@ -103,20 +105,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         <td class="action-cell">
           <button class="table-action-btn edit-btn"
-            {% if not user_logged_in or user == 'operator' %}
-                disabled title="Access Denied"
-            {% endif %}
-          >
-            <i class='bx bx-edit'></i>
-          </button>
+            {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}
+          ><i class='bx bx-edit'></i></button>
 
           <button class="table-action-btn delete-btn"
-            {% if not user_logged_in or user == 'operator' %}
-                disabled title="Access Denied"
-            {% endif %}
-          >
-            <i class='bx bx-trash'></i>
-          </button>
+            {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}
+          ><i class='bx bx-trash'></i></button>
         </td>
       `;
 
@@ -124,9 +118,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  /* =============================
-      ADD ROW
-  ============================== */
+  /* =========================================================
+       ADD NEW ROW (OPERATOR FIELD DISABLED)
+  ========================================================= */
   addRowBtn.addEventListener("click", () => {
 
     if (document.querySelector(".new-row")) return;
@@ -139,7 +133,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       <td><input type="text" class="edit-input" placeholder="Material Name"></td>
       <td><input type="text" class="edit-input" placeholder="Material Code"></td>
 
-      <!-- Operator Name AUTO - DISABLED -->
+      <!-- AUTO OPERATOR NAME (DISABLED) -->
       <td><input type="text" class="edit-input" value="{{ user }}" disabled></td>
 
       <td><input type="text" class="edit-input" value="0" disabled></td>
@@ -181,16 +175,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   });
 
-  /* =============================
-      EDIT / DELETE HANDLER
-  ============================== */
+  /* =========================================================
+       EDIT / DELETE (OPERATOR DISABLED)
+  ========================================================= */
   tableBody.addEventListener("click", async (e) => {
 
     // EDIT
     const editBtn = e.target.closest(".edit-btn");
     if (editBtn) {
+
       const row = editBtn.closest("tr");
       if (row.classList.contains("editing")) return;
+
       row.classList.add("editing");
 
       const cols = row.querySelectorAll("td");
@@ -200,7 +196,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const val = cols[i].innerText.trim();
 
         if (i === 3 || i === 4) {
-          // OperatorName + TotalExtracted = DISABLED
           cols[i].innerHTML = `<input class="edit-input" value="${val}" disabled>`;
         } else {
           cols[i].innerHTML = `<input class="edit-input" value="${val}">`;
@@ -243,18 +238,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!confirm(`Delete Silo ${siloNo}?`)) return;
 
-      const res = await fetch(`/api/stocks/delete/${siloNo}`, {
-        method: "DELETE"
-      });
+      const res = await fetch(`/api/stocks/delete/${siloNo}`, { method: "DELETE" });
 
       const result = await res.json();
       if (result.success) row.remove();
     }
+
   });
 
-  /* ============================
-      SEARCH
-  ============================ */
+  /* =========================================================
+       SEARCH FILTER
+  ========================================================= */
   searchBox.addEventListener("input", () => {
     const filter = searchBox.value.toLowerCase();
     Array.from(tableBody.querySelectorAll("tr")).forEach(row => {
@@ -262,11 +256,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
-  /* ============================
-      EXPORT
-  ============================ */
+  /* =========================================================
+       EXPORT EXCEL (FIXED ENDPOINT)
+  ========================================================= */
   exportBtn.addEventListener("click", async () => {
-    const res = await fetch("/apsi/stocks/export", { method: "POST" });
+    const res = await fetch("/api/stocks/export", { method: "POST" });
     const blob = await res.blob();
 
     const a = document.createElement("a");
@@ -278,4 +272,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadStocks();
 });
 </script>
+
 {% endblock %}
