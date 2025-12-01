@@ -7,8 +7,8 @@
   </div>
 
   <div class="inv-navbar-right">
-    <button class="add-btn" id="addRowBtn"{% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Add</button>
-    <button class="add-btn" id="exportBtn"{% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Export</button>
+    <button class="add-btn" id="addRowBtn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Add</button>
+    <button class="add-btn" id="exportBtn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Export</button>
     <input class="search-input" type="text" id="searchBox" placeholder="Search...">
   </div>
 </div>
@@ -21,7 +21,7 @@
         <th class="sortable" data-col="0">Silo No</th>
         <th class="sortable" data-col="1">Raw Material Name</th>
         <th class="sortable" data-col="2">Raw Material Code</th>
-        <th class="sortable" data-col="3">Operator Name</th>
+        <th>Operator Name</th>
         <th class="sortable" data-col="4">Total Consumption (Kg)</th>
         <th>Action</th>
       </tr>
@@ -33,7 +33,6 @@
   </table>
 </div>
 
-
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
 
@@ -42,9 +41,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const exportBtn = document.getElementById("exportBtn");
   const searchBox = document.getElementById("searchBox");
 
-  // =========================================================
-  // 🔽 SORTING LOGIC
-  // =========================================================
+  /* =============================
+       SORTING LOGIC
+  ============================== */
   let sortState = {};
 
   function sortTable(colIndex, numeric = false) {
@@ -60,8 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         bVal = parseFloat(bVal) || 0;
       }
 
-      if (sortState[colIndex] === "asc") return aVal > bVal ? 1 : -1;
-      return aVal < bVal ? 1 : -1;
+      return sortState[colIndex] === "asc" ? aVal > bVal : aVal < bVal ? 1 : -1;
     });
 
     tableBody.innerHTML = "";
@@ -73,74 +71,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     th.style.cursor = "pointer";
 
     th.addEventListener("click", () => {
-      // Column 0 → numeric sort (Silo No)
-      // Column 4 → numeric sort (TotalExtracted)
       const numericColumns = [0, 4];
       sortTable(index, numericColumns.includes(index));
     });
-
   });
 
-
-  // =========================================================
-  // 🔽 LOAD STOCK DATA
-  // =========================================================
+  /* =============================
+      LOAD STOCKS
+  ============================== */
   async function loadStocks() {
-    try {
-      const response = await fetch("/api/stocks");
-      const data = await response.json();
+    const response = await fetch("/api/stocks");
+    const data = await response.json();
 
-      tableBody.innerHTML = "";
+    tableBody.innerHTML = "";
 
-      if (!data.success || data.records.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="table-error">No records found</td></tr>`;
-        return;
-      }
-
-      data.records.forEach(row => {
-        const tr = document.createElement("tr");
-        tr.dataset.silono = row.SiloNo;
-
-        tr.innerHTML = `
-          <td>${row.SiloNo}</td>
-          <td>${row.MaterialName}</td>
-          <td>${row.MaterialCode}</td>
-          <td>${row.OperatorName}</td>
-          <td>${row.TotalExtracted}</td>
-
-          <td class="action-cell">
-
-            <button class="table-action-btn edit-btn"
-              {% if not user_logged_in or user == 'operator' %}
-                disabled title="Access Denied"
-              {% endif %}
-            >
-              <i class='bx bx-edit'></i>
-            </button>
-
-            <button class="table-action-btn delete-btn"
-              {% if not user_logged_in or user == 'operator' %}
-                disabled title="Access Denied"
-              {% endif %}
-            >
-              <i class='bx bx-trash'></i>
-            </button>
-
-          </td>
-        `;
-
-        tableBody.appendChild(tr);
-      });
-
-    } catch (err) {
-      tableBody.innerHTML = `<tr><td colspan="6" class="table-error">Failed to load data</td></tr>`;
+    if (!data.success || data.records.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="6" class="table-error">No records found</td></tr>`;
+      return;
     }
+
+    data.records.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.dataset.silono = row.SiloNo;
+
+      tr.innerHTML = `
+        <td>${row.SiloNo}</td>
+        <td>${row.MaterialName}</td>
+        <td>${row.MaterialCode}</td>
+        <td>${row.OperatorName}</td>
+        <td>${row.TotalExtracted}</td>
+
+        <td class="action-cell">
+          <button class="table-action-btn edit-btn"
+            {% if not user_logged_in or user == 'operator' %}
+                disabled title="Access Denied"
+            {% endif %}
+          >
+            <i class='bx bx-edit'></i>
+          </button>
+
+          <button class="table-action-btn delete-btn"
+            {% if not user_logged_in or user == 'operator' %}
+                disabled title="Access Denied"
+            {% endif %}
+          >
+            <i class='bx bx-trash'></i>
+          </button>
+        </td>
+      `;
+
+      tableBody.appendChild(tr);
+    });
   }
 
-
-  // =========================================================
-  // ➕ ADD NEW ROW
-  // =========================================================
+  /* =============================
+      ADD ROW
+  ============================== */
   addRowBtn.addEventListener("click", () => {
 
     if (document.querySelector(".new-row")) return;
@@ -152,7 +138,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       <td><input type="text" class="edit-input" placeholder="Silo No"></td>
       <td><input type="text" class="edit-input" placeholder="Material Name"></td>
       <td><input type="text" class="edit-input" placeholder="Material Code"></td>
-      <td><input type="text" class="edit-input" placeholder="Operator Name"></td>
+
+      <!-- Operator Name AUTO - DISABLED -->
+      <td><input type="text" class="edit-input" value="{{ user }}" disabled></td>
+
       <td><input type="text" class="edit-input" value="0" disabled></td>
 
       <td>
@@ -168,15 +157,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     tr.querySelector(".save-new-btn").onclick = async () => {
 
       const inputs = tr.querySelectorAll("input");
+
       const newData = {
         SiloNo: inputs[0].value.trim(),
         MaterialName: inputs[1].value.trim(),
-        MaterialCode: inputs[2].value.trim(),
-        OperatorName: inputs[3].value.trim()
+        MaterialCode: inputs[2].value.trim()
       };
 
       if (!newData.SiloNo || !newData.MaterialName) {
-        alert("Fill required fields.");
+        alert("Fill required fields!");
         return;
       }
 
@@ -192,10 +181,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     };
   });
 
-
-  // =========================================================
-  // ✏️ EDIT / DELETE ROWS
-  // =========================================================
+  /* =============================
+      EDIT / DELETE HANDLER
+  ============================== */
   tableBody.addEventListener("click", async (e) => {
 
     // EDIT
@@ -210,8 +198,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       for (let i = 0; i < 5; i++) {
         const val = cols[i].innerText.trim();
-        if (i === 4) cols[i].innerHTML = `<input disabled class="edit-input" value="${val}">`;
-        else cols[i].innerHTML = `<input class="edit-input" value="${val}">`;
+
+        if (i === 3 || i === 4) {
+          // OperatorName + TotalExtracted = DISABLED
+          cols[i].innerHTML = `<input class="edit-input" value="${val}" disabled>`;
+        } else {
+          cols[i].innerHTML = `<input class="edit-input" value="${val}">`;
+        }
       }
 
       cols[5].innerHTML = `
@@ -227,8 +220,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const updated = {
           SiloNo: inputs[0].value.trim(),
           MaterialName: inputs[1].value.trim(),
-          MaterialCode: inputs[2].value.trim(),
-          OperatorName: inputs[3].value.trim()
+          MaterialCode: inputs[2].value.trim()
         };
 
         const res = await fetch(`/api/stocks/update/${siloNo}`, {
@@ -245,7 +237,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // DELETE
     const deleteBtn = e.target.closest(".delete-btn");
-
     if (deleteBtn) {
       const row = deleteBtn.closest("tr");
       const siloNo = row.dataset.silono;
@@ -258,40 +249,30 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const result = await res.json();
       if (result.success) row.remove();
-      else alert(result.error);
     }
   });
 
-
-  // =========================================================
-  // 🔍 SEARCH FILTER
-  // =========================================================
+  /* ============================
+      SEARCH
+  ============================ */
   searchBox.addEventListener("input", () => {
     const filter = searchBox.value.toLowerCase();
-    Array.from(tableBody.querySelectorAll("tr")).forEach((row) => {
-      const text = row.innerText.toLowerCase();
-      row.style.display = text.includes(filter) ? "" : "none";
+    Array.from(tableBody.querySelectorAll("tr")).forEach(row => {
+      row.style.display = row.innerText.toLowerCase().includes(filter) ? "" : "none";
     });
   });
 
-
-  // =========================================================
-  // 📁 EXPORT EXCEL
-  // =========================================================
+  /* ============================
+      EXPORT
+  ============================ */
   exportBtn.addEventListener("click", async () => {
-    const res = await fetch("/api/stocks/export", {
-      method: "POST"
-    });
-
+    const res = await fetch("/apsi/stocks/export", { method: "POST" });
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
-    a.href = url;
+    a.href = URL.createObjectURL(blob);
     a.download = "MaterialData.xlsx";
     a.click();
-
-    URL.revokeObjectURL(url);
   });
 
   loadStocks();

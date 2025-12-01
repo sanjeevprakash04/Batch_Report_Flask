@@ -106,7 +106,61 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* ======================================================
-      ✔ RESTORE SESSION STORAGE
+      UNIVERSAL SORTING (supports Silo-XX numeric sorting)
+  ====================================================== */
+  let sortState = {};
+
+  function enableSorting(tableHead, tableBody) {
+    const headers = tableHead.querySelectorAll("th");
+
+    headers.forEach((th, colIndex) => {
+      th.style.cursor = "pointer";
+      th.addEventListener("click", () => sortTable(tableBody, colIndex));
+    });
+  }
+
+  function sortTable(body, colIndex) {
+    let rows = Array.from(body.querySelectorAll("tr"));
+    sortState[colIndex] = sortState[colIndex] === "asc" ? "desc" : "asc";
+
+    rows.sort((a, b) => {
+
+      let A = a.children[colIndex].innerText.trim();
+      let B = b.children[colIndex].innerText.trim();
+
+      /* 🔥 Special Case: Silo-X sorting */
+      const siloPattern = /^silo[-\s]?(\d+)$/i;
+
+      const aMatch = A.match(siloPattern);
+      const bMatch = B.match(siloPattern);
+
+      if (aMatch && bMatch) {
+        const numA = parseInt(aMatch[1]);
+        const numB = parseInt(bMatch[1]);
+
+        return sortState[colIndex] === "asc" ? numA - numB : numB - numA;
+      }
+
+      /* Normal numeric sorting fallback */
+      const numA = parseFloat(A);
+      const numB = parseFloat(B);
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return sortState[colIndex] === "asc" ? numA - numB : numB - numA;
+      }
+
+      /* String sorting */
+      return sortState[colIndex] === "asc"
+        ? A.localeCompare(B)
+        : B.localeCompare(A);
+    });
+
+    body.innerHTML = "";
+    rows.forEach(row => body.appendChild(row));
+  }
+
+  /* ======================================================
+      RESTORE SESSION STORAGE
   ====================================================== */
   function restoreSession() {
     const filters = JSON.parse(sessionStorage.getItem("analytics_filters"));
@@ -216,29 +270,21 @@ document.addEventListener("DOMContentLoaded", () => {
       { key: "Error_%", label: "Error (%)" }
     ];
 
-    // 🔹 Table Header
     tableHead.innerHTML = `
       <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
     `;
 
-    // 🔹 Table Body
     tableBody.innerHTML = "";
 
     data.forEach(row => {
       const tr = document.createElement("tr");
-
-      // Each cell uses c.key (correct!)
-      tr.innerHTML = cols
-        .map(c => `<td>${row[c.key] ?? ""}</td>`)
-        .join("");
-
-      tr.style.cursor = "pointer";
-
-      tr.addEventListener("click", () => openPopup(row["Category"]));
-
+      tr.innerHTML = cols.map(c => `<td>${row[c.key] ?? ""}</td>`).join("");
+      tr.addEventListener("click", () => openPopup(row.Category));
       tableBody.appendChild(tr);
     });
 
+    // 🔥 Enable sorting after table is rendered
+    setTimeout(() => enableSorting(tableHead, tableBody), 50);
   }
 
   /* ======================================================
@@ -262,8 +308,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const result = await res.json();
-
     const data = result.data;
+
     if (!data || data.length === 0) {
       popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
       popupTableBody.innerHTML = `<tr><td>No PLC Data Available</td></tr>`;
@@ -282,24 +328,20 @@ document.addEventListener("DOMContentLoaded", () => {
       { key: "TimeStamp", label: "Timestamp" }
     ];
 
-    // Only keep columns that exist in the data
     const cols = allCols.filter(col => col.key in data[0]);
 
-    // ---- Header ----
     popupTableHead.innerHTML =
       `<tr>${cols.map(col => `<th>${col.label}</th>`).join("")}</tr>`;
 
-    // ---- Body ----
     popupTableBody.innerHTML =
       data.map(row =>
         `<tr>${cols.map(col => `<td>${row[col.key] ?? ""}</td>`).join("")}</tr>`
       ).join("");
 
   }
+
   document.getElementById("downloadPopupExcel").addEventListener("click", async () => {
-
     const category = popupTitle.textContent.replace("PLC Data for: ", "");
-
     const hours = hourSelect.value;
     const from_time = fromDate.value;
     const to_time = toDate.value;
@@ -322,9 +364,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   closePopup.addEventListener("click", () => popup.style.display = "none");
-
-
-
 });
 </script>
 

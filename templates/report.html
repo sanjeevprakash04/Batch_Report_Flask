@@ -1,9 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<!-- ===============================
-      REPORT HEADER
-=============================== -->
+<!-- =============================== REPORT HEADER =============================== -->
 <div class="inv-navbar">
   <div class="inv-navbar-left">
     <span class="inv-app-title">Report</span>
@@ -36,27 +34,15 @@
   </div>
 </div>
 
-
-
-<!-- ===============================
-      REPORT TABLE
-=============================== -->
+<!-- =============================== REPORT TABLE =============================== -->
 <div class="report-table-wrapper">
   <table class="inv-table" id="reportTable">
-    <thead>
-      <tr><th>Waiting...</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>Waiting for data...</td></tr>
-    </tbody>
+    <thead><tr><th>Waiting...</th></tr></thead>
+    <tbody><tr><td>Waiting for data...</td></tr></tbody>
   </table>
 </div>
 
-
-
-<!-- ===============================
-      POPUP MODAL
-=============================== -->
+<!-- =============================== POPUP MODAL =============================== -->
 <div id="popupModal" class="popup-overlay" style="display:none;">
   <div class="popup-content">
     <h3 id="popupTitle" style="margin-left: 0.3rem;">PLC Data</h3>
@@ -64,7 +50,7 @@
     <div class="popup-table-wrapper">
       <table class="inv-table" id="popupTable">
         <thead><tr><th>Loading...</th></tr></thead>
-        <tbody><tr><td>Loading data...</td></tr></tbody>
+        <tbody><tr><td>Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -76,22 +62,7 @@
   </div>
 </div>
 
-
-
-<!-- ===============================
-      SORTING CSS
-=============================== -->
-<style>
-  th.sortable { cursor: pointer; user-select:none; }
-  th.sortable.asc::after { content:" ▲"; font-size:0.8rem; }
-  th.sortable.desc::after { content:" ▼"; font-size:0.8rem; }
-</style>
-
-
-
-<!-- ===============================
-      SCRIPT
-=============================== -->
+<!-- =============================== SCRIPT =============================== -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -114,281 +85,246 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-/* ------------------------------
-      Disable Future Dates
------------------------------- */
-  const now = new Date().toISOString().slice(0, 16);
-  fromDate.max = now;
-  toDate.max = now;
+/* ------------------------------ Disable Future Dates ------------------------------ */
+const now = new Date().toISOString().slice(0, 16);
+fromDate.max = now;
+toDate.max = now;
 
-  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
-  toDate.addEventListener("click", () => hourSelect.value = "Custom");
+fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+toDate.addEventListener("click", () => hourSelect.value = "Custom");
 
-  hourSelect.addEventListener("change", () => {
-    if (hourSelect.value !== "Custom") {
-      fromDate.value = "";
-      toDate.value = "";
-    }
-  });
-
-
-
-/* ------------------------------
-      Restore Session
------------------------------- */
-  function restoreSession() {
-    let savedFilters = JSON.parse(localStorage.getItem("report_filters"));
-    let savedTable = JSON.parse(localStorage.getItem("report_table"));
-    let savedTotal = localStorage.getItem("report_total");
-
-    if (savedFilters) {
-      hourSelect.value = savedFilters.hours;
-      fromDate.value = savedFilters.from_time;
-      toDate.value = savedFilters.to_time;
-    }
-
-    if (savedTable) {
-      renderTable(savedTable);
-      totalLabel.textContent = `Total Batch Weight (in Tons): ${savedTotal}`;
-    }
+hourSelect.addEventListener("change", () => {
+  if (hourSelect.value !== "Custom") {
+    fromDate.value = "";
+    toDate.value = "";
   }
-  restoreSession();
+});
 
 
 
-/* ------------------------------
-      Sorting Logic (Fixed)
------------------------------- */
-  function applySorting(tableHead, tableBody, data) {
+/* =====================================================
+   UNIVERSAL SORTING LOGIC (ASC + DESC)
+===================================================== */
+let sortState = {};
 
-    const headers = tableHead.querySelectorAll("th");
+function enableSorting(head, body) {
+    const headers = head.querySelectorAll("th");
 
     headers.forEach((th, index) => {
+        th.style.cursor = "pointer";
+        th.addEventListener("click", () => sortTable(body, index));
+    });
+}
 
-      th.classList.add("sortable");
-      th.dataset.order = "none";  // track state
+function sortTable(body, colIndex) {
 
-      th.addEventListener("click", () => {
+    let rows = Array.from(body.querySelectorAll("tr"));
+    sortState[colIndex] = sortState[colIndex] === "asc" ? "desc" : "asc";
 
-        // Reset other headers
-        headers.forEach(h => {
-          if (h !== th) {
-            h.dataset.order = "none";
-            h.classList.remove("asc", "desc");
-          }
-        });
+    rows.sort((a, b) => {
+        let aVal = a.children[colIndex]?.innerText.trim() || "";
+        let bVal = b.children[colIndex]?.innerText.trim() || "";
 
-        // Toggle sort order
-        if (th.dataset.order === "none" || th.dataset.order === "desc") {
-          th.dataset.order = "asc";
-          th.classList.add("asc");
-          th.classList.remove("desc");
-        } else {
-          th.dataset.order = "desc";
-          th.classList.add("desc");
-          th.classList.remove("asc");
+        // Auto numeric detection
+        const isNumeric = !isNaN(parseFloat(aVal)) && !isNaN(parseFloat(bVal));
+
+        if (isNumeric) {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
         }
 
-        const isAsc = th.dataset.order === "asc";
-
-        data.sort((a, b) => {
-          let aVal = Object.values(a)[index];
-          let bVal = Object.values(b)[index];
-
-          let aNum = parseFloat(aVal);
-          let bNum = parseFloat(bVal);
-
-          if (!isNaN(aNum) && !isNaN(bNum)) {
-            return isAsc ? aNum - bNum : bNum - aNum;
-          }
-
-          return isAsc
-            ? String(aVal).localeCompare(String(bVal))
-            : String(bVal).localeCompare(String(aVal));
-        });
-
-        renderTable(data);
-      });
-    });
-  }
-
-
-
-/* ------------------------------
-      Render Main Table
------------------------------- */
-  function renderTable(data) {
-
-    const columns = Object.keys(data[0]);
-
-    tableHead.innerHTML = `
-      <tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr>
-    `;
-
-    tableBody.innerHTML = data
-      .map(row => `
-        <tr onclick="openPopup('${row["BatchNo"]}')">
-          ${columns.map(c => `<td>${row[c]}</td>`).join("")}
-        </tr>
-      `)
-      .join("");
-
-    setTimeout(() => applySorting(tableHead, tableBody, data), 10);
-  }
-
-
-
-/* ------------------------------
-      View Button Handler
------------------------------- */
-  viewBtn.addEventListener("click", async () => {
-
-    const hours = hourSelect.value;
-    const from_time = fromDate.value;
-    const to_time = toDate.value;
-
-    if (hours === "Custom" && (!from_time || !to_time)) {
-      alert("Select both From & To for Custom range!");
-      return;
-    }
-
-    tableHead.innerHTML = "<tr><th>Loading...</th></tr>";
-    tableBody.innerHTML = "<tr><td>Loading...</td></tr>";
-
-    const res = await fetch("/api/report_data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hours, from_time, to_time })
+        if (sortState[colIndex] === "asc") {
+            return aVal > bVal ? 1 : -1;
+        }
+        return aVal < bVal ? 1 : -1;
     });
 
-    const result = await res.json();
-    if (!result.success) return;
+    // Update table
+    body.innerHTML = "";
+    rows.forEach(r => body.appendChild(r));
+}
 
-    renderTable(result.data);
-    totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
 
-    localStorage.setItem("report_filters", JSON.stringify({ hours, from_time, to_time }));
-    localStorage.setItem("report_table", JSON.stringify(result.data));
-    localStorage.setItem("report_total", result.total_weight);
+
+/* ------------------------------ Render Main Table ------------------------------ */
+function renderTable(data) {
+
+  const columns = Object.keys(data[0]);
+
+  tableHead.innerHTML = `
+    <tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr>
+  `;
+
+  tableBody.innerHTML = data
+    .map(row => `
+      <tr onclick="openPopup('${row["BatchNo"]}')">
+        ${columns.map(c => `<td>${row[c]}</td>`).join("")}
+      </tr>
+    `)
+    .join("");
+
+  // Enable sorting for ALL columns
+  setTimeout(() => enableSorting(tableHead, tableBody), 10);
+}
+
+
+
+/* ------------------------------ Restore Session ------------------------------ */
+function restoreSession() {
+  let savedFilters = JSON.parse(localStorage.getItem("report_filters"));
+  let savedTable = JSON.parse(localStorage.getItem("report_table"));
+  let savedTotal = localStorage.getItem("report_total");
+
+  if (savedFilters) {
+    hourSelect.value = savedFilters.hours;
+    fromDate.value = savedFilters.from_time;
+    toDate.value = savedFilters.to_time;
+  }
+
+  if (savedTable) {
+    renderTable(savedTable);
+    totalLabel.textContent = `Total Batch Weight (in Tons): ${savedTotal}`;
+  }
+}
+restoreSession();
+
+
+
+/* ------------------------------ View Button Handler ------------------------------ */
+viewBtn.addEventListener("click", async () => {
+
+  const hours = hourSelect.value;
+  const from_time = fromDate.value;
+  const to_time = toDate.value;
+
+  tableHead.innerHTML = "<tr><th>Loading...</th></tr>";
+  tableBody.innerHTML = "<tr><td>Loading...</td></tr>";
+
+  const res = await fetch("/api/report_data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hours, from_time, to_time })
   });
 
+  const result = await res.json();
+  if (!result.success) return;
+
+  renderTable(result.data);
+  totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
+
+  localStorage.setItem("report_filters", JSON.stringify({ hours, from_time, to_time }));
+  localStorage.setItem("report_table", JSON.stringify(result.data));
+  localStorage.setItem("report_total", result.total_weight);
+});
 
 
-/* ------------------------------
-      Export Excel
------------------------------- */
-  exportBtn.addEventListener("click", async () => {
 
-    const hours = hourSelect.value;
-    const from_time = fromDate.value;
-    const to_time = toDate.value;
+/* ------------------------------ Export Excel ------------------------------ */
+exportBtn.addEventListener("click", async () => {
 
-    const res = await fetch("/api/export_data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hours, from_time, to_time })
-    });
+  const hours = hourSelect.value;
+  const from_time = fromDate.value;
+  const to_time = toDate.value;
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "Report.xlsx";
-    a.click();
-
-    URL.revokeObjectURL(url);
+  const res = await fetch("/api/export_data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hours, from_time, to_time })
   });
 
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
 
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Report.xlsx";
+  a.click();
 
-/* ------------------------------
-      Popup Logic
------------------------------- */
-
-  window.openPopup = async function(batchNo) {
-
-    popup.style.display = "flex";
-    popupTitle.textContent = `PLC Data for BatchNo: ${batchNo}`;
-
-    popupTableHead.innerHTML = "<tr><th>Loading...</th></tr>";
-    popupTableBody.innerHTML = "<tr><td>Loading...</td></tr>";
-
-    const res = await fetch("/api/plc_data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ batch_no: batchNo })
-    });
-
-    const result = await res.json();
-    const data = result.data;
-
-    if (!data || data.length === 0) {
-      popupTableHead.innerHTML = "<tr><th>No Data</th></tr>";
-      popupTableBody.innerHTML = "<tr><td>No PLC data found</td></tr>";
-      return;
-    }
-
-    // ✔ FIXED COLUMN ORDER
-    const cols = [
-      { key: "SiloNo", label: "Silo No" },
-      { key: "Category", label: "Category" },
-      { key: "MaterialName", label: "Material Name" },
-      { key: "SetWeight", label: "Set Weight (Kg)" },
-      { key: "ActualWeight", label: "Actual Weight (Kg)" },
-      { key: "Difference", label: "Difference (Kg)" },
-      { key: "Tolerance", label: "Tolerance (Kg)" }
-    ];
-
-
-    popupTableHead.innerHTML = `
-      <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
-    `;
-
-    popupTableBody.innerHTML = data
-      .map(row => `
-        <tr>
-          ${cols.map(c => `<td>${row[c.key] ?? ""}</td>`).join("")}
-        </tr>
-      `)
-      .join("");
-
-    setTimeout(() => applySorting(popupTableHead, popupTableBody, data), 10);
-
-    document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
-    document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
-  };
-
-
-  closePopup.addEventListener("click", () => popup.style.display = "none");
+  URL.revokeObjectURL(url);
+});
 
 
 
-/* ------------------------------
-      Download PDF / Excel
------------------------------- */
-  async function downloadReport(type, batchNo) {
+/* ------------------------------ POPUP VIEW ------------------------------ */
+window.openPopup = async function(batchNo) {
 
-    const endpoint = type === "pdf" ? "/api/plc_data/pdf" : "/api/plc_data/excel";
-    const filename = `BatchReport_${batchNo}.${type === "pdf" ? "pdf" : "xlsx"}`;
+  popup.style.display = "flex";
+  popupTitle.textContent = `PLC Data for BatchNo: ${batchNo}`;
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ batch_no: batchNo })
-    });
+  popupTableHead.innerHTML = "<tr><th>Loading...</th></tr>";
+  popupTableBody.innerHTML = "<tr><td>Loading...</td></tr>";
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+  const res = await fetch("/api/plc_data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ batch_no: batchNo })
+  });
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
+  const result = await res.json();
+  const data = result.data;
 
-    URL.revokeObjectURL(url);
+  if (!data || data.length === 0) {
+    popupTableHead.innerHTML = "<tr><th>No Data</th></tr>";
+    popupTableBody.innerHTML = "<tr><td>No PLC data found</td></tr>";
+    return;
   }
 
+  const cols = [
+    { key: "SiloNo", label: "Silo No" },
+    { key: "Category", label: "Category" },
+    { key: "MaterialName", label: "Material Name" },
+    { key: "SetWeight", label: "Set Weight (Kg)" },
+    { key: "ActualWeight", label: "Actual Weight (Kg)" },
+    { key: "Difference", label: "Difference (Kg)" },
+    { key: "Tolerance", label: "Tolerance (Kg)" }
+  ];
+
+  popupTableHead.innerHTML = `
+    <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
+  `;
+
+  popupTableBody.innerHTML = data
+    .map(row => `
+      <tr>
+        ${cols.map(c => `<td>${row[c.key] ?? ""}</td>`).join("")}
+      </tr>
+    `)
+    .join("");
+
+  // Enable sorting for popup table
+  setTimeout(() => enableSorting(popupTableHead, popupTableBody), 10);
+
+
+  document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
+  document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
+};
+
+document.getElementById("closePopup").onclick = () => popup.style.display = "none";
+
+
+
+/* ------------------------------ Download Report ------------------------------ */
+async function downloadReport(type, batchNo) {
+
+  const endpoint = type === "pdf" ? "/api/plc_data/pdf" : "/api/plc_data/excel";
+  const filename = `BatchReport_${batchNo}.${type === "pdf" ? "pdf" : "xlsx"}`;
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ batch_no: batchNo })
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
 
 });
 </script>

@@ -89,6 +89,54 @@ document.addEventListener("DOMContentLoaded", () => {
     const data = await res.json();
     renderTree(data);
   }
+  /* =====================================================
+   UNIVERSAL SORTING LOGIC (ASC + DESC)
+===================================================== */
+  let recipeSortState = {};
+
+  function enableRecipeSorting(table) {
+      const head = table.querySelector("thead");
+      const body = table.querySelector("tbody");
+
+      if (!head || !body) return;
+
+      const headers = head.querySelectorAll("th");
+
+      headers.forEach((th, colIndex) => {
+          th.style.cursor = "pointer";
+
+          th.addEventListener("click", () => sortRecipeTable(body, colIndex));
+      });
+  }
+
+  function sortRecipeTable(body, colIndex) {
+
+      let rows = Array.from(body.querySelectorAll("tr"));
+      recipeSortState[colIndex] = recipeSortState[colIndex] === "asc" ? "desc" : "asc";
+
+      rows.sort((a, b) => {
+          let aVal = a.children[colIndex]?.innerText.trim() || "";
+          let bVal = b.children[colIndex]?.innerText.trim() || "";
+
+          // Auto numeric detection
+          const isNumeric = !isNaN(parseFloat(aVal)) && !isNaN(parseFloat(bVal));
+
+          if (isNumeric) {
+              aVal = parseFloat(aVal) || 0;
+              bVal = parseFloat(bVal) || 0;
+          }
+
+          if (recipeSortState[colIndex] === "asc") {
+              return aVal > bVal ? 1 : -1;
+          } else {
+              return aVal < bVal ? 1 : -1;
+          }
+      });
+
+      // Re-render table
+      body.innerHTML = "";
+      rows.forEach(r => body.appendChild(r));
+  }
 
   function renderTree(data) {
     childList.innerHTML = "";
@@ -137,43 +185,48 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ---------------- BUILD TABLE ---------------- */
   function buildTable(category, rows) {
 
-    const wrapper = document.createElement("div");
+      const wrapper = document.createElement("div");
 
-    const table = document.createElement("table");
-    table.className = "data-table";
+      const table = document.createElement("table");
+      table.className = "data-table";
 
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th style="display:none;">Index</th>
-          <th>Silo No</th>
-          <th>Material Name</th>
-          <th>Set Weight(Kg)</th>
-          <th>Fine Weight(Kg)</th>
-          <th>Tolerance(kg)</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-
-      <tbody id="recipeTableBody">
-        ${rows.map(r => `
-          <tr data-index="${r.Index}" data-category="${category}">
-            <td style="display:none;">${r.Index}</td>
-            <td>${r.SiloNo}</td>
-            <td>${r.MaterialName}</td>
-            <td>${r.SetWeight}</td>
-            <td>${r.FineWeight}</td>
-            <td>${r.Tolerance}</td>
-            <td class="action-cell">
-              <button class="table-action-btn edit-btn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-edit"></i></button>
-              <button class="table-action-btn delete-btn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-trash"></i></button>
-            </td>
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th style="display:none;">Index</th>
+            <th>Silo No</th>
+            <th>Material Name</th>
+            <th>Set Weight(Kg)</th>
+            <th>Fine Weight(Kg)</th>
+            <th>Tolerance(kg)</th>
+            <th>Action</th>
           </tr>
-        `).join("")}
-      </tbody>
-    `;
-    wrapper.appendChild(table);
-    return wrapper;
+        </thead>
+
+        <tbody id="recipeTableBody">
+          ${rows.map(r => `
+            <tr data-index="${r.Index}" data-category="${category}">
+              <td style="display:none;">${r.Index}</td>
+              <td>${r.SiloNo}</td>
+              <td>${r.MaterialName}</td>
+              <td>${r.SetWeight}</td>
+              <td>${r.FineWeight}</td>
+              <td>${r.Tolerance}</td>
+              <td class="action-cell">
+                <button class="table-action-btn edit-btn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-edit"></i></button>
+                <button class="table-action-btn delete-btn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-trash"></i></button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      `;
+
+      wrapper.appendChild(table);
+
+      /* 🔥 Enable Sorting for this recipe table */
+      setTimeout(() => enableRecipeSorting(table), 10);
+
+      return wrapper;
   }
 
   /* ---------------- ADD ROW ---------------- */

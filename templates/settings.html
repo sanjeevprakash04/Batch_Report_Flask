@@ -23,9 +23,14 @@
 
             <div class="bottom">
                 <span>Report Name</span>
-                <input type="text" style="margin-left:1.7rem" placeholder="Enter Report Name">
-                <button style="margin-left:1rem;">Set Name</button>
+                <input type="text" id="reportNameInput" style="margin-left:1.7rem" placeholder="Enter Report Name">
+                
+                <!-- Hidden file input for logo -->
+                <input type="file" id="logoFileInput" accept="image/*" hidden>
+
+                <button id="setReportNameBtn" style="margin-left:1rem;">Set Name</button>
             </div>
+
         </div>
         {% endif %}
 
@@ -86,5 +91,47 @@
     </div>
 
 </div>
+
+<script>
+document.getElementById("setReportNameBtn").addEventListener("click", async () => {
+    
+    const nameInput = document.getElementById("reportNameInput").value.trim();
+
+    // Ask if user wants to upload logo image
+    const uploadLogo = confirm("Do you want to upload a logo image?");
+
+    let formData = new FormData();
+    formData.append("report_name", nameInput);
+
+    if (uploadLogo) {
+        document.getElementById("logoFileInput").click();
+
+        document.getElementById("logoFileInput").onchange = async () => {
+            const file = document.getElementById("logoFileInput").files[0];
+            if (file) {
+                formData.append("logo", file);
+            }
+            await sendUpdateRequest(formData);
+        };
+    } else {
+        await sendUpdateRequest(formData);
+    }
+});
+
+async function sendUpdateRequest(formData) {
+    const res = await fetch("/api/settings/update_report", {
+        method: "POST",
+        body: formData
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+        alert("Updated Successfully!");
+    } else {
+        alert("Error: " + result.error);
+    }
+}
+</script>
 
 {% endblock %}

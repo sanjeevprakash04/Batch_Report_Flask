@@ -9,6 +9,7 @@ import webbrowser
 import threading
 import plotly
 import subprocess
+import os
 
 #Modules
 from auth import authLog, authMac
@@ -1005,6 +1006,39 @@ def settings():
     )
 
 
+@app.route("/api/settings/update_report", methods=["POST"])
+def update_report():
+    try:
+        report_name = request.form.get("report_name")
+        
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+        # 1️⃣ - Update report name
+        if report_name and report_name.strip():
+            cursorWrite.execute(
+                "UPDATE Info_DB SET Info = ? WHERE Particulars = 'Company_Name'",
+                (report_name,)
+            )
+            conn.commit()
+
+        # 2️⃣ - Save uploaded logo into data_files/
+        if "logo" in request.files:
+            logo = request.files["logo"]
+
+            if logo.filename != "":
+                # Ensure directory exists
+                save_dir = os.path.join("data_files")
+                os.makedirs(save_dir, exist_ok=True)
+
+                # Final save path
+                save_path = os.path.join(save_dir, "logo.png")
+                logo.save(save_path)
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 def is_admin():
     return session.get("role") in ["admin", "superadmin"]
 
@@ -1068,66 +1102,51 @@ def add_stock():
         data = request.get_json()
         silono = data["SiloNo"]
 
+        operator_name = session.get("username", "Unknown")
+
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
 
-        # ❗ Check if SiloNo already exists
         cursorRead.execute("SELECT 1 FROM MaterialData WHERE SiloNo = ?", (silono,))
-        exists = cursorRead.fetchone()
+        if cursorRead.fetchone():
+            return jsonify({"success": False, "error": f"SiloNo {silono} already exists."})
 
-        if exists:
-            return jsonify({
-                "success": False,
-                "error": f"SiloNo {silono} already exists. Please use another."
-            })
-
-        # Insert new row
         cursorWrite.execute("""
             INSERT INTO MaterialData (SiloNo, MaterialName, MaterialCode, OperatorName)
             VALUES (?, ?, ?, ?)
-        """, (data["SiloNo"], data["MaterialName"], data["MaterialCode"], data["OperatorName"]))
-        
+        """, (silono, data["MaterialName"], data["MaterialCode"], operator_name))
+
         conn.commit()
         return jsonify({"success": True})
 
     except Exception as e:
-        print("Add Error:", e)
         return jsonify({"success": False, "error": str(e)})
 
 # Update existing stock
-# Update stock data
 @app.route("/api/stocks/update/<string:old_silono>", methods=["PUT"])
 def update_stock(old_silono):
     try:
         data = request.get_json()
         new_silono = data["SiloNo"]
 
+        operator_name = session.get("username", "Unknown")
+
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
 
-        # Step 1: Check if SiloNo changed
         if old_silono != new_silono:
-            # Step 2: If changed, check if new SiloNo already exists
             cursorRead.execute("SELECT 1 FROM MaterialData WHERE SiloNo = ?", (new_silono,))
-            exists = cursorRead.fetchone()
+            if cursorRead.fetchone():
+                return jsonify({"success": False, "error": f"SiloNo {new_silono} already exists."})
 
-            if exists:
-                return jsonify({
-                    "success": False,
-                    "error": f"SiloNo {new_silono} already exists. Choose another."
-                })
-
-        # Step 3: Update the row safely
         cursorWrite.execute("""
             UPDATE MaterialData
             SET SiloNo = ?, MaterialName = ?, MaterialCode = ?, OperatorName = ?
             WHERE SiloNo = ?
-        """, (new_silono, data["MaterialName"], data["MaterialCode"], data["OperatorName"], old_silono))
+        """, (new_silono, data["MaterialName"], data["MaterialCode"], operator_name, old_silono))
 
         conn.commit()
-
         return jsonify({"success": True})
 
     except Exception as e:
-        print("Update Error:", e)
         return jsonify({"success": False, "error": str(e)})
 
 # Delete stock by SiloNo
