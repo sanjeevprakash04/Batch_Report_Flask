@@ -5,14 +5,14 @@
   <div class="inv-navbar-left recipe">
     <span class="inv-app-title">Recipe List</span>
     <div class="list-opt">
-      <button class="icon-button" id="importBtn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %} title="Import"><i class="bx bx-import"></i></button>
-      <button class="icon-button" id="exportBtn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %} title="Export"><i class="bx bx-export"></i></button>
+      <button class="icon-button" id="importBtn" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %} title="Import"><i class="bx bx-import"></i></button>
+      <button class="icon-button" id="exportBtn" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %} title="Export"><i class="bx bx-export"></i></button>
     </div>
   </div>
 
   <div class="inv-navbar-right recipe">
     <div class="table-opt">
-      <button class="add-btn" id="addRowRecipe" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}>Add</button>
+      <button class="add-btn" id="addRowRecipe" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %}>Add</button>
 
       <div style="display:flex;gap:0.2rem;align-items:center;">
         <span style="font-weight:600;">Selected Recipe:</span>
@@ -20,7 +20,7 @@
           style="background:#fff;border:1px solid #aaa;padding:0.3rem 0.5rem;border-radius:0.2rem;">--</span>
       </div>
 
-      <button class="icon-button" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %} title="Download"><i class="bx bxs-download"></i></button>
+      <button class="icon-button" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %} title="Download"><i class="bx bxs-download"></i></button>
     </div>
   </div>
 </div>
@@ -36,14 +36,14 @@
     <div class="tree-actions">
 
       <i class='bx bx-file-blank add-icon 
-          {% if not user_logged_in or user == 'operator' %} disabled-icon {% endif %}'
-          title="{% if not user_logged_in or user == 'operator' %}Access Denied{% else %}Add Recipe{% endif %}"
+          {% if not user_logged_in or role == 'operator' %} disabled-icon {% endif %}'
+          title="{% if not user_logged_in or role == 'operator' %}Access Denied{% else %}Add Recipe{% endif %}"
           id="addRecipeIcon">
       </i>
 
       <i class='bx bx-trash delete-icon 
-          {% if not user_logged_in or user == 'operator' %} disabled-icon {% endif %}'
-          title="{% if not user_logged_in or user == 'operator' %}Access Denied{% else %}Delete Recipe{% endif %}"
+          {% if not user_logged_in or role == 'operator' %} disabled-icon {% endif %}'
+          title="{% if not user_logged_in or role == 'operator' %}Access Denied{% else %}Delete Recipe{% endif %}"
           id="deleteRecipe">
       </i>
 
@@ -213,8 +213,8 @@ document.addEventListener("DOMContentLoaded", () => {
               <td>${r.FineWeight}</td>
               <td>${r.Tolerance}</td>
               <td class="action-cell">
-                <button class="table-action-btn edit-btn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-edit"></i></button>
-                <button class="table-action-btn delete-btn" {% if not user_logged_in or user == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-trash"></i></button>
+                <button class="table-action-btn edit-btn" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-edit"></i></button>
+                <button class="table-action-btn delete-btn" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %}><i class="bx bx-trash"></i></button>
               </td>
             </tr>
           `).join("")}

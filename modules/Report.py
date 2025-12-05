@@ -82,12 +82,15 @@ def encode_logo(logo_path):
 #     )
 #     return pdf_bytes
 
-def generate_pdf_report(df_pivot, df_string, batch_no):
+def generate_pdf_report(df_pivot, df_string, batch_no, df_cal_sum):
     # Load logo
     logo_base64 = encode_logo("data_files/logo.png")
 
     get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] \
         if not df_string[df_string["Name"] == k].empty else "N/A"
+    
+    get_cal_value = lambda k: df_cal_sum.loc[df_cal_sum["Name"] == k, "Value"].iloc[0] \
+        if not df_cal_sum[df_cal_sum["Name"] == k].empty else "N/A" 
 
     details = {
         "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
@@ -95,21 +98,13 @@ def generate_pdf_report(df_pivot, df_string, batch_no):
         "recipe_name": get_value("Recipe Name"),
         "start_time": get_value("Start Date Time"),
         "end_time": get_value("End Date Time"),
-        "batch_no": batch_no
+        "batch_no": batch_no,
+        "time_taken": get_cal_value("BatchTimeMinutes"),
+        "total_set_weight": get_cal_value("TotalBatchSetWeight"),
+        "total_actual_weight": get_cal_value("TotalBatchActualWeight"),
     }
 
-    # Time difference
-    try:
-        st = datetime.strptime(details["start_time"], '%Y-%m-%d %H:%M:%S')
-        ed = datetime.strptime(details["end_time"], '%Y-%m-%d %H:%M:%S')
-        details["time_taken"] = str(ed - st)
-    except:
-        details["time_taken"] = "N/A"
-
-    details.update({
-        "total_set_weight": df_pivot["SetWeight"].sum(),
-        "total_actual_weight": round(df_pivot["ActualWeight"].sum(), 2),
-    })
+    
 
     # Generate HTML
     html = generate_html_report(df_pivot, logo_base64, details)
@@ -134,16 +129,26 @@ def generate_pdf_report(df_pivot, df_string, batch_no):
 # ==========================================================
 # 🔹 Excel Report Generator
 # ==========================================================
-def generate_excel_report(df_pivot, df_string, batch_no):
-    get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] if not df_string[df_string["Name"] == k].empty else "N/A"
+def generate_excel_report(df_pivot, df_string, batch_no, df_cal_sum):
+    get_value = lambda k: df_string.loc[df_string["Name"] == k, "Value"].iloc[0] \
+        if not df_string[df_string["Name"] == k].empty else "N/A"
+    
+    get_cal_value = lambda k: df_cal_sum.loc[df_cal_sum["Name"] == k, "Value"].iloc[0] \
+        if not df_cal_sum[df_cal_sum["Name"] == k].empty else "N/A" 
+
     details = {
         "printed_date": datetime.now().strftime("%d-%m-%Y %H:%M"),
         "plant_name": get_value("Plant Name"),
         "recipe_name": get_value("Recipe Name"),
         "start_time": get_value("Start Date Time"),
         "end_time": get_value("End Date Time"),
-        "batch_no": batch_no
+        "batch_no": batch_no,
+        "time_taken": get_cal_value("BatchTimeMinutes"),
+        "total_set_weight": get_cal_value("TotalBatchSetWeight"),
+        "total_actual_weight": get_cal_value("TotalBatchActualWeight"),
     }
+
+    
 
     output = io.BytesIO()
     wb = Workbook()
@@ -245,9 +250,9 @@ def generate_html_report(df, logo_base64, details):
         <div class="container">
             <div class="info-section">
                 <table>
-                    <tr><td><b>Recipe Name:</b></td><td>{details['recipe_name']}</td><td><b>Time Taken:</b></td><td>{details['time_taken']}</td></tr>
-                    <tr><td><b>Batch No:</b></td><td>{details['batch_no']}</td><td><b>Total Set Weight:</b></td><td>{details['total_set_weight']} Kg</td></tr>
-                    <tr><td><b>Start Time:</b></td><td>{details['start_time']}</td><td><b>Total Actual Weight:</b></td><td>{details['total_actual_weight']} Kg</td></tr>
+                    <tr><td><b>Recipe Name:</b></td><td>{details['recipe_name']}</td><td><b>Time Taken(Min):</b></td><td>{details['time_taken']}</td></tr>
+                    <tr><td><b>Batch No:</b></td><td>{details['batch_no']}</td><td><b>Total Set Weight(Kg):</b></td><td>{details['total_set_weight']} Kg</td></tr>
+                    <tr><td><b>Start Time:</b></td><td>{details['start_time']}</td><td><b>Total Actual Weight(Kg):</b></td><td>{details['total_actual_weight']} Kg</td></tr>
                     <tr><td><b>End Time:</b></td><td>{details['end_time']}</td></tr>
                 </table>
             </div>

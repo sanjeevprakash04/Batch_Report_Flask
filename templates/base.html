@@ -82,13 +82,13 @@
                     <a href="{{ url_for('about') }}"><i class="bx bxs-info-circle"></i> About</a>
                 </li>
 
-                {% if user == 'superadmin' %}
+                {% if role in ['admin', 'superadmin'] %}
                 <li class="{% if request.path == url_for('super_admin') %}active{% endif %}">
                     <a href="{{ url_for('super_admin') }}"><i class="bx bxs-user-rectangle"></i> User Management</a>
                 </li>
                 {% endif %}
 
-                {% if user in ['admin', 'superadmin'] %}
+                {% if role in ['admin', 'superadmin'] %}
                 <li class="{% if request.path == url_for('settings') %}active{% endif %}">
                     <a href="{{ url_for('settings') }}"><i class="bx bxs-cog"></i> Settings</a>
                 </li>

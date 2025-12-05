@@ -11,7 +11,7 @@
 
     <div class="upper">
 
-        {% if user in ['admin', 'superadmin'] %}
+        {% if role in ['admin', 'superadmin'] %}
         <div class="upper-left">
             <span style="padding:0.65rem 0.6rem; background:#005da2;color:white;">General Settings</span>
 
@@ -34,7 +34,7 @@
         </div>
         {% endif %}
 
-        {% if user == 'superadmin' %}
+        {% if role == 'superadmin' %}
         <div class="upper-right">
             <span style="padding:0.65rem 0.6rem;background:#005da2;color:white;">Configure Connection</span>
 
@@ -57,7 +57,7 @@
 
     <div class="lower">
 
-        {% if user in ['admin', 'superadmin'] %}
+        {% if role in ['admin', 'superadmin'] %}
         <div class="lower-left">
             <span style="padding:0.65rem 0.6rem;background:#005da2;color:white;">Database Backup</span>
             <div class="one">
@@ -66,7 +66,7 @@
             </div>
         </div>
         {% endif %}
-        {% if user == 'superadmin' %}
+        {% if role == 'superadmin' %}
         
         <div class="lower-right">
             <span style="padding:0.65rem 0.6rem;background:#005da2;color:white;">Configure Data</span>

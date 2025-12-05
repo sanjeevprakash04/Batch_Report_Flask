@@ -150,7 +150,22 @@ def report_data_process(batch_no):
             return pd.DataFrame(), pd.DataFrame(), None
 
         df_string = df[df["Category"] == "Info"].copy()
-        df = df[df["Category"] != "Info"].copy()
+        
+
+        df_cal_sum = df[df["Category"] == "Summary"].copy()
+
+        # Convert only numeric values
+        numeric_vals = pd.to_numeric(df_cal_sum["Value"], errors="coerce")
+
+        # Round numeric ones to 2 decimals and keep date/time as original
+        df_cal_sum["Value"] = numeric_vals.round(2).astype(str).where(
+            ~numeric_vals.isna(),  # if numeric → keep rounded
+            df_cal_sum["Value"]    # if non-numeric (date/time) → keep original
+        )
+
+        # Remove Info and Summary rows
+        df = df[~df["Category"].isin(["Info", "Summary"])].copy()
+
 
         df_pivot = df.pivot(index='Category', columns='Name', values='Value')
         original_order = df['Name'].unique()
@@ -170,9 +185,142 @@ def report_data_process(batch_no):
         df_pivot = df_pivot[column_order]  # Only include these columns in the table
         df_pivot["SiloNo"] = df_pivot["SiloNo"].astype(int)
         
-        return df_pivot, df_string, daily_batch_no
+        return df_pivot, df_string, daily_batch_no, df_cal_sum
     except Exception as e:
         print(f"❌ Error in plc_data_process: {e}")
         return {"success": False, "error": str(e)}
+
+
+def dashboard_calculations(start_timestamp, end_timestamp):
+    try:
+        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+        engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        # ===============================
+        # 1. READ PLC DATA
+        # ===============================
+        query_plc = f"""
+            SELECT *
+            FROM plc_data
+            WHERE TimeStamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+        """
+        df_plc = pd.read_sql_query(query_plc, engineConRead)
+
+        if df_plc.empty:
+            return {"status": "error", "message": "No PLC data found"}
+
+        # ===============================
+        # 2. READ BATCH LOGS
+        # ===============================
+        query_batches = f"""
+            SELECT *
+            FROM Batches
+            WHERE TimeStamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+        """
+        df_batches = pd.read_sql_query(query_batches, engineConRead)
+
+        if df_batches.empty:
+            return {"status": "error", "message": "No batch records found"}
+
+        df_batches["TimeStamp"] = pd.to_datetime(df_batches["TimeStamp"], errors="coerce")
+        df_batches["Hour"] = df_batches["TimeStamp"].dt.floor("H")
+
+        # ============================================================
+        # LINE CHART: HOURLY BATCH COUNTS 
+        # ============================================================
+        batch_counts_per_hr = (
+            df_batches.groupby("Hour")["BatchNo"]
+            .nunique()
+            .reset_index(name="BatchCount")
+        )
+
+        # Convert hours to strings for JSON serialization
+        batch_counts_per_hr["Hour"] = batch_counts_per_hr["Hour"].astype(str)
+
+        # ============================================================
+        # SUMMARY CARD CALCULATIONS
+        # ============================================================
+
+        # Today's Production (tons)
+        df_prod = df_plc[df_plc["Name"] == "TotalBatchActualWeight"]
+        total_production_tons = round(df_prod["Value"].sum() / 1000.0, 2)
+
+        # No. of batches
+        number_of_batches = int((df_plc["Name"] == "Recipe Name").sum())
+
+        # Tons per hour (TPH) = highest hourly output
+        tph = 0
+        if not batch_counts_per_hr.empty:
+            tph = int(batch_counts_per_hr["BatchCount"].max())
+
+        # Batch Accuracy
+        df_acc = df_plc[df_plc["Name"] == "BatchAccuracy"]
+        batch_accuracy = round(df_acc["Value"].mean(), 2) if not df_acc.empty else 0.0
+
+        # Avg Batch Cycle Time (mins)
+        df_cycle = df_plc[df_plc["Name"] == "BatchTimeMinutes"]
+        avg_cycle_time = round(df_cycle["Value"].mean(), 2) if not df_cycle.empty else 0.0
+
+        # ============================================================
+        # BAR CHART — RAW MATERIAL CONSUMPTION
+        # ============================================================
+        df_filtered = df_plc[~df_plc["Category"].isin(["Info", "Summary"])]
+        weights_df = df_filtered[df_filtered["Name"].isin(["ActualWeight", "SetWeight"])]
+        weights_df["Value"] = pd.to_numeric(weights_df["Value"], errors="coerce")
+
+        pivot_bar = (
+            weights_df.pivot_table(
+                index="Category",
+                columns="Name",
+                values="Value",
+                aggfunc="mean",
+                fill_value=0
+            )
+            .reset_index()
+        )
+
+        # Convert to list of dicts for JSON
+        bar_chart_data = pivot_bar.to_dict(orient="records")
+
+        # ============================================================
+        # DONUT CHART — RECIPE %
+        # ============================================================
+        recipe_df = df_plc[df_plc["Name"] == "Recipe Name"]
+        recipe_counts = recipe_df["Value"].value_counts().reset_index()
+        recipe_counts.columns = ["RecipeName", "Count"]
+
+        recipe_chart_data = recipe_counts.to_dict(orient="records")
+
+        # ============================================================
+        # FINAL RETURN JSON (for dashboard.js)
+        # ============================================================
+        return {
+            "status": "success",
+
+            # Summary Cards
+            "summary": {
+                "total_production_tons": total_production_tons,
+                "num_batches": number_of_batches,
+                "tph": tph,
+                "batch_accuracy": batch_accuracy,
+                "avg_cycle_time": avg_cycle_time
+            },
+
+            # Line Chart
+            "line_chart": batch_counts_per_hr.to_dict(orient="records"),
+
+            # Donut Chart
+            "recipe_chart": recipe_chart_data,
+
+            # Bar Chart
+            "raw_material_chart": bar_chart_data
+        }
+
+    except Exception as e:
+        print("❌ Error in dashboard_calculations:", e)
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 

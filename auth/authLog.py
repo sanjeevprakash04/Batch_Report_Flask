@@ -8,15 +8,15 @@ def get_user(username):
 
     # Unpack from your sqliteCon method
     conn, cursorRead, cursorWrite = get_db_connection()
-    cursor = cursorWrite
+
 
     # Fetch the user
-    cursor.execute('SELECT * FROM users WHERE user_name = ?', (username,))
-    user = cursor.fetchone()
+    cursorRead.execute('SELECT * FROM users WHERE username = ?', (username,))
+    user = cursorRead.fetchone()
 
     # Update last_login if user found
     if user:
-        cursor.execute('UPDATE users SET last_login = ? WHERE user_name = ?', (current_time, username))
+        cursorWrite.execute('UPDATE users SET last_login = ? WHERE username = ?', (current_time, username))
         conn.commit()
 
     conn.close()

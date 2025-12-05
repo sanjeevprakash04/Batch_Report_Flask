@@ -31,12 +31,12 @@
                     <input type="text" id="editUsername" name="editUsername" readonly>
                 </div>
                 <div class="form-group">
-                    <label for="newPassword">New Password</label>
-                    <input type="password" id="newPassword" name="newPassword" required>
+                    <label for="editNewPassword">New Password</label>
+                    <input type="password" id="editNewPassword" name="newPassword" required>
                 </div>
                 <div class="form-group">
-                    <label for="confirmPassword">Confirm Password</label>
-                    <input type="password" id="confirmPassword" name="confirmPassword" required>
+                    <label for="editConfirmPassword">Confirm Password</label>
+                    <input type="password" id="editConfirmPassword" name="confirmPassword" required>
                 </div>
                 <button type="submit" class="login-btn">Update Password</button>
             </form>
@@ -129,21 +129,78 @@
             table.querySelectorAll('tbody tr').forEach(row => {
                 const actionCell = document.createElement('td');
                 row.appendChild(actionCell);
-                addEditIcon(row, actionCell);
+                addActionIcons(row, actionCell);
             });
     
-            function addEditIcon(row, cell) {
-                cell.innerHTML = `<i class='bx bx-edit' style='cursor:pointer; font-size:1.2rem;'></i>`;
-                const editIcon = cell.querySelector('i');
+            function addActionIcons(row, cell) {
+                cell.innerHTML = `
+                    <i class='bx bx-edit edit-row' style='cursor:pointer; font-size:1.2rem; margin-right:0.5rem;' title="Edit User"></i>
+                    <i class='bx bx-key edit-pass' style='cursor:pointer; font-size:1.2rem; margin-right:0.5rem; color:purple;' title="Change Password"></i>
+                    <i class='bx bx-trash delete-user' style='cursor:pointer; font-size:1.2rem; color:red; ' title="Delete User"></i>
+                `;
+                const editIcon = cell.querySelector('.edit-row');
+                const passIcon = cell.querySelector('.edit-pass');
+                const deleteIcon = cell.querySelector('.delete-user');
     
                 if (!userLoggedIn) {
-                    editIcon.style.opacity = '0.5';
-                    editIcon.style.cursor = 'not-allowed';
-                    editIcon.title = 'Login required to edit';
+                    [editIcon, passIcon, deleteIcon].forEach(icon => {
+                        icon.style.opacity = '0.5';
+                        icon.style.cursor = 'not-allowed';
+                        icon.title = 'Login required';
+                    });
                     return;
                 }
-    
+
                 editIcon.addEventListener('click', () => {
+                    if (row.classList.contains("editing")) return; 
+                    row.classList.add("editing");
+
+                    const userName = row.children[1].textContent.trim();
+                    const role = row.children[4].textContent.trim();
+
+
+                    row.children[2].innerHTML = `
+                        <select class="access-select">
+                            <option value="admin" ${role === "admin" ? "selected" : ""}>admin</option>
+                            <option value="operator" ${role === "operator" ? "selected" : ""}>operator</option>
+                            <option value="user" ${role === "user" ? "selected" : ""}>user</option>
+                        </select>`;
+
+
+                    // Replace action cell with save/cancel
+                    row.lastElementChild.innerHTML = `
+                        <i class='bx bx-check save-edit' style='cursor:pointer; font-size:1.2rem; margin-right:0.5rem; color:green;' title="Save"></i>
+                        <i class='bx bx-x cancel-edit' style='cursor:pointer; font-size:1.2rem; color:red;' title="Cancel"></i>
+                    `;
+
+                    const saveBtn = row.querySelector('.save-edit');
+                    const cancelBtn = row.querySelector('.cancel-edit');
+
+                    saveBtn.addEventListener('click', () => {
+                        const newAccess = row.querySelector('.access-select').value;
+
+                        fetch("/update_user_details", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ username: userName, role: newAccess })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert("User Access updated successfully.");
+                                window.location.reload();
+                            } else {
+                                alert("Failed to update user: " + data.error);
+                            }
+                        });
+                    });
+
+                    cancelBtn.addEventListener('click', () => {
+                        window.location.reload();
+                    });
+                });
+    
+                passIcon.addEventListener('click', () => {
                     const username = row.children[1].textContent.trim(); // adjust index as needed
                     document.getElementById("editUsername").value = username;
                     document.getElementById("newPassword").value = "";
@@ -151,6 +208,30 @@
 
                     const modal = document.getElementById("passwordEditModal");
                     modal.style.display = "block";
+                });
+
+                deleteIcon.addEventListener('click', () => {
+                    const userName = row.children[1].textContent.trim();
+
+                    if (!confirm(`Are you sure you want to delete user "${userName}"?`)) return;
+
+                    fetch("/delete_user", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username: userName })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert("User deleted successfully.");
+                            window.location.reload();
+                        } else {
+                            alert("Failed to delete user: " + data.error);
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error:", err);
+                    });
                 });
             }
         });
@@ -172,8 +253,8 @@
         document.getElementById("passwordEditForm").addEventListener("submit", function (e) {
             e.preventDefault();
             const username = document.getElementById("editUsername").value;
-            const newPassword = document.getElementById("newPassword").value;
-            const confirmPassword = document.getElementById("confirmPassword").value;
+            const newPassword = document.getElementById("editNewPassword").value;
+            const confirmPassword = document.getElementById("editConfirmPassword").value;
 
             if (newPassword !== confirmPassword) {
                 alert("Passwords do not match.");
@@ -200,6 +281,107 @@
                 alert("Failed to update password.");
             });
         });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+        const addButton = document.getElementById("add-button");
+        const tableWrapper = document.querySelector(".inventory-table-wrapper");
+
+        tableWrapper.addEventListener("change", (e) => {
+            if (e.target.classList.contains("toggle-active")) {
+                const userId = e.target.getAttribute("data-userid");
+                const isActive = e.target.checked ? 1 : 0;
+
+                fetch("/toggle_user_active", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: userId, is_active: isActive })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert("Failed to update user status: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                });
+            }
+        });
+
+        // Insert row logic
+        addButton.addEventListener("click", () => {
+            const table = document.querySelector(".inventory-table-wrapper table");
+            if (!table || addButton.disabled) return;
+            if (table.querySelector(".new-row")) return; // prevent multiple new rows
+
+            const tbody = table.querySelector("tbody");
+            const newRow = document.createElement("tr");
+            newRow.classList.add("new-row");
+
+            // Columns: Id | Username | Role | Is_Active | LastLogin | Action
+            // Id, Is_Active, LastLogin → keep blank
+            newRow.innerHTML = `
+                <td></td>
+                <td><input type="text" class="edit-input" placeholder="Enter username" /></td>
+                <td>
+                    <select class="Role-select">
+                        <option value="admin">admin</option>
+                        <option value="operator">operator</option>
+                        <option value="user">user</option>
+                    </select>
+                </td>
+                <td></td>
+                <td></td>
+                <td>
+                    <i class='bx bx-check save-new' style='cursor:pointer; font-size:1.5rem; margin-right: 0.5rem; color:green'></i>
+                    <i class='bx bx-x cancel-new' style='cursor:pointer; font-size:1.5rem; color:red'></i>
+                </td>
+            `;
+
+            tbody.appendChild(newRow);
+
+            const usernameInput = newRow.querySelector("input");
+            const roleSelect = newRow.querySelector(".Role-select");
+            
+            usernameInput.focus();
+
+            const saveBtn = newRow.querySelector(".save-new");
+            const cancelBtn = newRow.querySelector(".cancel-new");
+
+            // Save logic
+            saveBtn.addEventListener("click", () => {
+                const username = usernameInput.value.trim();
+                const role = roleSelect.value;
+                
+
+                if (!username || !role ) {
+                    alert("Please fill username, select role and access.");
+                    return;
+                }
+
+                fetch("/add_user", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, role }),
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert("Failed to add user: " + data.error);
+                    }
+                });
+            });
+
+            // Cancel logic
+            cancelBtn.addEventListener("click", () => {
+                newRow.remove();
+            });
+        });
+    });
     </script>
 
 {% endblock %}

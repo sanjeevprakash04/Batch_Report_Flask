@@ -22,6 +22,134 @@ body {
     text-align: center;
 }
 
+/* ==============================
+   GLOBAL GRID
+============================== */
+.dashboard-grid {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 24px;
+}
+
+/* ==============================
+   SUMMARY CARDS (3 on top, 2 below)
+============================== */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 20px 28px; 
+    justify-items: center;
+}
+
+.summary-cards .card {
+    width: 220px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f0f0f0;
+    transition: 0.25s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.card h3 {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+/* Default value style */
+.card .value {
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+/* Unit text */
+.card .unit {
+    font-size: 12px;
+    color: #9da3af;
+    margin-top: -6px;
+}
+
+/* ==============================
+   SPECIAL COLOR STYLING
+============================== */
+
+/* 1️⃣ Today's Production → value orange */
+.summary-cards .card:nth-child(1) .value {
+    color: #ff7a00;
+}
+
+/* 2️⃣ No. of Batches → blue background + white font */
+.summary-cards .card:nth-child(2) {
+    background: #007bff;
+    color: white;
+}
+
+.summary-cards .card:nth-child(2) h3,
+.summary-cards .card:nth-child(2) .value {
+    color: white !important;
+}
+
+/* 3️⃣ Tons per Hour → green background + white font */
+.summary-cards .card:nth-child(3) {
+    background: #22c55e;
+    color: white;
+}
+
+.summary-cards .card:nth-child(3) h3,
+.summary-cards .card:nth-child(3) .value,
+.summary-cards .card:nth-child(3) .unit {
+    color: white !important;
+}
+
+/* 4️⃣ Batch Accuracy → blue font */
+.summary-cards .card:nth-child(4) .value {
+    color: #007bff;
+}
+
+/* 5️⃣ Avg Batch Cycle Time → yellow font */
+.summary-cards .card:nth-child(5) .value {
+    color: #ffd000;
+}
+
+/* ==============================
+   CHART BOXES
+============================== */
+.chart-box {
+    background: #ffffff;
+    padding: 22px;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f3f4f6;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-title {
+    margin-bottom: 18px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #374151;
+}
+
+/* Canvas size (similar to reference) */
+canvas {
+    width: 100% !important;
+    height: 360px !important;
+}
+
+
+
 
 /* ==============================
    🧭 MAIN NAVBAR
@@ -1297,41 +1425,101 @@ tr.editing input:focus {
    🔒 LOGIN + PASSWORD MODALS
 ============================== */
 
-.modal,
 .pass-modal {
-  display: none;
-  position: fixed;
-  z-index: 10000;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background-color: rgba(0,0,0,0.6);
-  animation: fadeIn 0.3s ease-in;
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.6);
+    animation: fadeIn 0.3s ease-in;
 }
 
-.modal-content,
 .pass-modal-content {
-  background: #fff;
-  margin: 10% auto;
-  padding: 2.5rem;
-  border-radius: 12px;
-  width: 360px;
-  max-width: 95%;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
-  animation: slideUp 0.3s ease-in;
-  position: relative;
+    background: #fff;
+    margin: 10% auto;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 360px;
+    max-width: 95%;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+    position: relative;
+    animation: slideUp 0.3s ease-in;
 }
 
-.modal-content h2,
 .pass-modal-content h2 {
-  text-align: center;
-  margin-bottom: 0.8rem;
-  color: #005da2;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+/* Modal Background */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    animation: fadeIn 0.3s ease-in;
+}
+  
+/* Modal Box */
+.modal-content {
+    background: #fff;
+    /* color: #fff; */
+    margin: 10% auto;
+    padding: 2.5rem;
+    border-radius: 12px;
+    width: 360px;
+    max-width: 95%;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+    animation: slideUp 0.3s ease-in;
+    position: relative;
+}
+
+/* Heading */
+.modal-content h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.8rem;
 }
 
 .modal-content p {
-  text-align: center;
-  color: #555;
-  margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    /* color: #bbb; */
+}
+
+/* Form Fields */
+.form-group {
+    margin-bottom: 1.2rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+    padding-left: 0.2rem;
+    /* color: #ddd; */
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.65rem;
+    border-radius: 6px;
+    border: 1px solid #444;
+    background-color: #fff;
+    /* color: #fff; */
+    font-size: 1rem;
 }
 
 .form-group {
@@ -1971,6 +2159,12 @@ tr.editing input:focus {
     box-shadow: 0 0 3px rgba(0, 93, 162, 0.5);
 }
 
+
+th {
+    position: relative;
+    padding-right: 0.5rem; /* space for arrow */
+}
+
 .row-checkbox {
     width: 1rem;
     height: 1rem;
@@ -1978,9 +2172,38 @@ tr.editing input:focus {
     accent-color: #005da2;
 }
 
-th {
+
+.toggle-active {
+    width: 40px;
+    height: 20px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ccc;
+    outline: none;
+    border-radius: 20px;
     position: relative;
-    padding-right: 0.5rem; /* space for arrow */
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.toggle-active:checked {
+    background: #005da2;
+}
+
+.toggle-active::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    top: 1px;
+    left: 1px;
+    transition: transform 0.3s;
+}
+
+.toggle-active:checked::before {
+    transform: translateX(20px);
 }
 
 /* .header-label {
@@ -2003,6 +2226,7 @@ th {
 } */
 
 /* Animations */
+/* Animations */
 @keyframes fadeIn {
     from {opacity: 0;}
     to {opacity: 1;}
@@ -2012,6 +2236,7 @@ th {
     from {transform: translateY(40px); opacity: 0;}
     to {transform: translateY(0); opacity: 1;}
 }
+
 
 
 /* =========================================

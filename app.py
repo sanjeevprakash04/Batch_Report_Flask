@@ -10,6 +10,7 @@ import threading
 import plotly
 import subprocess
 import os
+import sqlite3
 
 #Modules
 from auth import authLog, authMac
@@ -64,6 +65,39 @@ def home():
 def dashboard():
     return render_template('dashboard.html')
 
+
+@app.route("/api/dashboard", methods=["GET"])
+def get_dashboard():
+
+    try:
+        # Read query parameters
+        start_time = request.args.get("start_time")
+        end_time = request.args.get("end_time")
+
+        # Validate missing values
+        if not start_time or not end_time:
+            return jsonify({
+                "status": "error",
+                "message": "start_time and end_time are required"
+            }), 400
+
+        # Convert to datetime
+        s_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+        e_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+
+        # Your calculation function
+        result = main.dashboard_calculations(s_time, e_time)
+
+        return jsonify({
+            "status": "success",
+            "data": result
+        })
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 @app.route('/logs')
 def logs():
     return render_template('logs.html')
@@ -72,7 +106,9 @@ def logs():
 @app.route('/recipe')
 def recipe():
     user_logged_in = 'username' in session
-    return render_template('recipe.html',   user_logged_in=user_logged_in)
+    user_role = session.get("role")  # <-- Get role from session
+    
+    return render_template('recipe.html',   user_logged_in=user_logged_in, role = user_role)
 
 @app.route("/api/material/<silo_no>", methods=["GET"])
 def get_material_by_silo(silo_no):
@@ -593,7 +629,7 @@ def api_plc_data():
         if not batch_no:
             return jsonify({"success": False, "error": "Missing BatchNo"}), 400
 
-        df_pivot, df_string, daily_batch_no = main.report_data_process(batch_no)
+        df_pivot, df_string, daily_batch_no, df_cal_sum = main.report_data_process(batch_no)
         if isinstance(df_pivot, dict) and not df_pivot.get("success", True):
             return jsonify(df_pivot)
 
@@ -613,8 +649,8 @@ def api_plc_data_pdf():
         if not batch_no:
             return jsonify({"success": False, "error": "BatchNo missing"}), 400
 
-        df_pivot, df_string, daily_batch_no = main.report_data_process(batch_no)
-        pdf_bytes = Report.generate_pdf_report(df_pivot, df_string, batch_no)
+        df_pivot, df_string, daily_batch_no, df_cal_sum = main.report_data_process(batch_no)
+        pdf_bytes = Report.generate_pdf_report(df_pivot, df_string, batch_no, df_cal_sum)
 
         return send_file(
             io.BytesIO(pdf_bytes),
@@ -636,8 +672,8 @@ def api_plc_data_excel():
         if not batch_no:
             return jsonify({"success": False, "error": "BatchNo missing"}), 400
 
-        df_pivot, df_string, daily_batch_no = main.report_data_process(batch_no)
-        excel_bytes = Report.generate_excel_report(df_pivot, df_string, batch_no)
+        df_pivot, df_string, daily_batch_no, df_cal_sum = main.report_data_process(batch_no)
+        excel_bytes = Report.generate_excel_report(df_pivot, df_string, batch_no, df_cal_sum)
 
         return send_file(
             io.BytesIO(excel_bytes),
@@ -998,11 +1034,12 @@ def analytics_tab(tab):
 @app.route('/settings')
 def settings():
     user_logged_in = 'username' in session
-
+    user_role = session.get("role")  # <-- Get role from session
 
     return render_template(
         "settings.html",
-        user_logged_in=user_logged_in
+        user_logged_in=user_logged_in,
+        role=user_role  # <-- Pass role to frontend
     )
 
 
@@ -1045,7 +1082,15 @@ def is_admin():
 @app.route('/stocks')
 def stocks():
     user_logged_in = 'username' in session
-    return render_template('stocks.html', user_logged_in=user_logged_in)
+    username = session.get("username")     # <-- ADD THIS
+    user_role = session.get("role")        # <-- ADD THIS
+    
+    return render_template(
+        'stocks.html',
+        user_logged_in=user_logged_in,
+        user=username,                     # <-- SEND user
+        role=user_role                     # <-- SEND role
+    )
 
 # ✅ API Route — returns live data for the Stocks table
 @app.route("/api/stocks", methods=["GET"])
@@ -1206,47 +1251,50 @@ def export_material_data():
 def about():
     return render_template('about.html')
 
+
 @app.route('/super_admin')
 def super_admin():
     user_logged_in = 'username' in session
     df = sqliteCon.dfUser()
+    df['Is_Active'] = df.apply(
+        lambda row: (
+            f"<input type='checkbox' class='toggle-active' data-userid='{row['Id']}' {'checked' if row['Is_Active'] == 1 else ''} />"
+        ),
+        axis=1
+    )
+
+    # Hide real DB Id (optional: drop it from UI)
+    df = df.drop(columns=['Id'])
+
     table_html = df.to_html(classes='table table-striped', index=False, escape=False, table_id='inventory-table')
     return render_template('super_admin.html', table=table_html, user_logged_in=user_logged_in)
 
-@app.route('/update_user_password', methods=['POST'])
-def update_user_password():
-    data = request.get_json()
-    username = data.get('username')
-    new_password = data.get('new_password')
 
-    if not username or not new_password:
-        return jsonify(success=False, error="Invalid data")
-
-    try:
-        conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-        
-        hashed = generate_password_hash(new_password)
-
-        cursorWrite.execute("UPDATE users SET password_hash = ? WHERE user_name = ?", (hashed, username))
-        conn.commit()
-        conn.close()
-        return jsonify(success=True)
-    except Exception as e:
-        return jsonify(success=False, error=str(e))
+# --------------------------------- LOGIN ------------------------------------
 
 @app.route('/login', methods=['POST'])
 def login():
-    username = request.form['username']
-    password = request.form['password']
+    username = request.form["username"]
+    password = request.form["password"]
 
-    user = authLog.get_user(username)
+    user = authLog.get_user(username)  
+    # user = (id, username, password_hash, role, user_access, is_active, last_login)
+    print(user)
+
     if user and check_password_hash(user[2], password):
-        session.permanent = True
-        session['username'] = user[1]
-        session['role'] = user[3]
-        return jsonify(success=True)
-    else:
-        return jsonify(success=False, error="Invalid Credentials"), 403
+
+        if user[4] == 1:  # active?
+            session.permanent = True
+            session['username'] = user[1]
+            session['role'] = user[3]
+            return jsonify(success=True)
+
+        return jsonify(success=False, error="Your account is deactivated."), 403
+
+    return jsonify(success=False, error="Invalid Credentials"), 403
+
+
+# --------------------- USER SELF CHANGE PASSWORD ----------------------------
 
 @app.route('/change_password', methods=['POST'])
 def change_password():
@@ -1254,45 +1302,133 @@ def change_password():
         return jsonify(success=False, error="Not logged in"), 403
 
     data = request.get_json()
-    old_password = data.get('oldPassword')
-    new_password = data.get('newPassword')
-
-    username = session['username']
+    old_password = data.get("oldPassword")
+    new_password = data.get("newPassword")
 
     conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
-    if conn is None:
-        return jsonify(success=False, error="Database connection error"), 500
+
+    cursorRead.execute("SELECT password_hash FROM users WHERE username=?", (session['username'],))
+    row = cursorRead.fetchone()
+    if not row:
+        return jsonify(success=False, error="User not found")
+
+    if not check_password_hash(row[0], old_password):
+        return jsonify(success=False, error="Old password incorrect")
+
+    new_hash = generate_password_hash(new_password)
+    cursorWrite.execute("UPDATE users SET password_hash=? WHERE username=?", (new_hash, session['username']))
+    conn.commit()
+    conn.close()
+
+    return jsonify(success=True)
+
+
+# ---------------------- ADMIN UPDATE USER PASSWORD --------------------------
+
+@app.route('/update_user_password', methods=['POST'])
+def update_user_password():
+    data = request.get_json()
+    username = data.get("username")
+    new_password = data.get("new_password")
+
+    if not username or not new_password:
+        return jsonify(success=False, error="Invalid data")
+
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    hashed = generate_password_hash(new_password)
+    cursorWrite.execute("UPDATE users SET password_hash=? WHERE username=?", (hashed, username))
+
+    conn.commit()
+    conn.close()
+    return jsonify(success=True)
+
+
+# ---------------------- ADMIN UPDATE USER ACCESS ----------------------------
+
+@app.route("/update_user_details", methods=["POST"])
+def update_user_details():
+    data = request.get_json()
+    username = data.get("username")
+    user_access = data.get("user_access")
+
+    if not username or not user_access:
+        return jsonify(success=False, error="Missing fields")
+
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    cursorWrite.execute("UPDATE users SET user_access=? WHERE username=?", (user_access, username))
+    conn.commit()
+    conn.close()
+
+    return jsonify(success=True)
+
+
+# ------------------------------ ADD USER -----------------------------------
+
+@app.route("/add_user", methods=["POST"])
+def add_user():
+    data = request.get_json()
+    username = data.get("username")
+    role = data.get("role")
+    print("Adding user:", username, "with role:", role)
+
+    if not username or not role :
+        return jsonify(success=False, error="Missing fields")
+
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    # default password
+    hashed = generate_password_hash("12345678")
 
     try:
+        cursorWrite.execute("""
+            INSERT INTO users (username, password_hash, role, is_active)
+            VALUES (?, ?, ?, 1)
+        """, (username, hashed, role))
 
-        # Fetch the stored password hash
-        cursorWrite.execute('SELECT password_hash FROM users WHERE user_name = ?', (username,))
-        row = cursorWrite.fetchone()
-
-        if not row:
-            return jsonify(success=False, error="User not found"), 404
-
-        stored_password_hash = row[0]
-
-        if check_password_hash(stored_password_hash, old_password):
-            # If old password matches, update with new password
-            new_password_hash = generate_password_hash(new_password)
-
-            cursorWrite.execute('UPDATE users SET password_hash = ? WHERE user_name = ?', (new_password_hash, username))
-            conn.commit()
-
-            return jsonify(success=True)
-        else:
-            return jsonify(success=False, error="Old password is incorrect."), 400
-
-    except Exception as e:
-        print("Error during password change:", e)
-        return jsonify(success=False, error=str(e)), 500
-
-    finally:
+        conn.commit()
         conn.close()
+        return jsonify(success=True)
+
+    except sqlite3.IntegrityError:
+        return jsonify(success=False, error="User already exists")
 
 
+# ----------------------------- TOGGLE ACTIVE -------------------------------
+
+@app.route("/toggle_user_active", methods=["POST"])
+def toggle_user_active():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    is_active = data.get("is_active")
+
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    cursorWrite.execute("UPDATE users SET is_active=? WHERE id=?", (is_active, user_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify(success=True)
+
+
+# ----------------------------- DELETE USER ---------------------------------
+
+@app.route("/delete_user", methods=["POST"])
+def delete_user():
+    data = request.get_json()
+    username = data.get("username")
+
+    if not username:
+        return jsonify(success=False, error="Missing username")
+
+    conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
+
+    cursorWrite.execute("DELETE FROM users WHERE username=?", (username,))
+    conn.commit()
+    conn.close()
+
+    return jsonify(success=True)  
 @app.route('/logout')
 def logout():
     session.clear()

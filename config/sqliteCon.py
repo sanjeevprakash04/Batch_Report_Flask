@@ -40,11 +40,16 @@ def get_db_connection_engine():
 
 # === Example Function to Read Users Table ===
 def dfUser():
+    conn, cursorRead, cursorWrite = get_db_connection()
     engine, engineConRead, engineConWrite = get_db_connection_engine()
-    query = """SELECT id, user_name, role, last_login FROM users WHERE role != 'SuperAdmin';"""
-    df = pd.read_sql_query(query, engineConRead)
-    df.columns = ['Id', 'Username', 'Role', 'LastLogin']
-    df = df.sort_values(by='Id', ascending=True)
+    query = "SELECT id, username, role, is_active, last_login FROM users WHERE role != 'superadmin';"
+    df = pd.read_sql_query(query, conn)
+    df.columns = ['Id', 'Username', 'Role', 'Is_Active', 'LastLogin']
+    df = df.sort_values(by='Id', ascending=True).reset_index(drop=True)
+
+    # Add UI numbering (starting from 1)
+    df.insert(0, 'UID', df.index + 1)
+
     return df
 
 

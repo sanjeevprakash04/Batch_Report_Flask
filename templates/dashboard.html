@@ -1,32 +1,271 @@
 {% extends 'base.html' %}
-
 {% block content %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <div class="inv-navbar">
-    <!-- Left side: menu + name -->
     <div class="inv-navbar-left">
         <span class="inv-app-title">Dashboard</span>
     </div>
-    <!-- <div class="inv-navbar-right">
-        <button class="inv-button">Connect</button>
-        <button class="inv-button">Disconnect</button>
-    </div> -->
-</div>
-<div class="dashboard-content">
-    <div class="upper">
-        <div class="upper-left">
-            <text>Error: PLC not Connected</text>
+
+    <div class="inv-navbar-right">
+
+        <select id="hourSelect" class="inv-select">
+            <option value="1 Hr">1 Hr</option>
+            <option value="4 Hr">4 Hr</option>
+            <option value="8 Hr">8 Hr</option>
+            <option value="12 Hr">12 Hr</option>
+            <option value="24 Hr">24 Hr</option>
+            <option value="Custom">Custom</option>
+        </select>
+
+        <div class="date-filter">
+            <span>From:</span>
+            <input type="datetime-local" id="fromDate" class="inv-input">
         </div>
-        <div class="upper-right">
-            <text>Error: PLC not Connected</text>
+
+        <div class="date-filter">
+            <span>To:</span>
+            <input type="datetime-local" id="toDate" class="inv-input">
+        </div>
+
+    </div>
+</div>
+
+<!-- ============================
+     2x2 GRID LAYOUT
+=============================== -->
+<div class="dashboard-grid">
+
+    <!-- ========== 1. Summary Cards ========== -->
+    <div class="grid-item">
+        <div class="summary-cards">
+            <div class="card">
+                <h3>Today's Production</h3>
+                <p class="value" id="prod_today">0</p>
+                <span class="unit">tons</span>
+            </div>
+
+            <div class="card">
+                <h3>No. of Batches</h3>
+                <p class="value" id="batch_count">0</p>
+            </div>
+
+            <div class="card">
+                <h3>Tons per Hour</h3>
+                <p class="value" id="tph">0</p>
+                <span class="unit">TPH</span>
+            </div>
+
+            <div class="card">
+                <h3>Batch Accuracy</h3>
+                <p class="value" id="batch_acc">0%</p>
+            </div>
+
+            <div class="card">
+                <h3>Avg Batch Cycle Time</h3>
+                <p class="value" id="cycle_time">0</p>
+                <span class="unit">min</span>
+            </div>
         </div>
     </div>
-    <div class="lower">
-        <div class="lower-left">
-            <text>Error: PLC not Connected</text>
-        </div>
-        <div class="lower-right">
-            <text>Error: PLC not Connected</text>
+
+    <!-- ========== 2. Line Chart ========== -->
+    <div class="grid-item">
+        <div class="chart-box">
+            <h3 class="chart-title">Production Line</h3>
+            <canvas id="lineChart"></canvas>
         </div>
     </div>
+
+    <!-- ========== 3. Recipe Pie Chart ========== -->
+    <div class="grid-item">
+        <div class="chart-box">
+            <h3 class="chart-title">Recipe</h3>
+            <canvas id="recipeChart"></canvas>
+        </div>
+    </div>
+
+    <!-- ========== 4. Bar Chart ========== -->
+    <div class="grid-item">
+        <div class="chart-box">
+            <h3 class="chart-title">Raw Material Consumption</h3>
+            <canvas id="siloChart"></canvas>
+        </div>
+    </div>
+
 </div>
+
+
+<script>
+/* =========================================================
+   GLOBAL CHART INSTANCES
+========================================================= */
+let lineChart, recipeChart, siloChart;
+
+/* =========================================================
+   SAVE FILTERS TO LOCAL STORAGE
+========================================================= */
+function saveFilters(from, to, hours) {
+    localStorage.setItem("dash_from", from);
+    localStorage.setItem("dash_to", to);
+    localStorage.setItem("dash_hours", hours);
+}
+
+/* =========================================================
+   LOAD FILTERS ON PAGE LOAD
+========================================================= */
+function loadFilters() {
+    const from = localStorage.getItem("dash_from");
+    const to = localStorage.getItem("dash_to");
+    const hours = localStorage.getItem("dash_hours");
+
+    if (from) document.getElementById("fromDate").value = from;
+    if (to) document.getElementById("toDate").value = to;
+    if (hours) document.getElementById("hourSelect").value = hours;
+
+    if (from && to) fetchDashboard(from, to);
+}
+
+/* =========================================================
+   LIMIT DATE PICKER TO CURRENT TIME
+========================================================= */
+const now = new Date().toISOString().slice(0, 16);
+document.getElementById("fromDate").max = now;
+document.getElementById("toDate").max = now;
+
+/* =========================================================
+   WHEN USER CLICKS DATE → SWITCH TO CUSTOM
+========================================================= */
+fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+toDate.addEventListener("click", () => hourSelect.value = "Custom");
+
+/* =========================================================
+   AUTO HANDLE HOUR SELECTION
+========================================================= */
+hourSelect.addEventListener("change", () => {
+  if (hourSelect.value !== "Custom") {
+    fromDate.value = "";
+    toDate.value = "";
+  }
+});
+
+/* =========================================================
+   MANUAL DATE CHANGE
+========================================================= */
+function applyManual() {
+    let from = fromDate.value;
+    let to = toDate.value;
+
+    if (from && to) {
+        saveFilters(from, to, "Custom");
+        fetchDashboard(from, to);
+    }
+}
+
+fromDate.addEventListener("change", applyManual);
+toDate.addEventListener("change", applyManual);
+
+/* =========================================================
+   REQUEST DASHBOARD API
+========================================================= */
+function fetchDashboard(from, to) {
+    let start = from.replace("T", " ") + ":00";
+    let end = to.replace("T", " ") + ":00";
+
+    fetch(`/api/dashboard?start_time=${start}&end_time=${end}`)
+        .then(res => res.json())
+        .then(api => {
+            if (api.status === "success") {
+                const d = api.data;  // backend returns {status, data}
+
+                updateSummary(d.summary);
+                updateLineChart(d.line_chart);
+                updateRecipeChart(d.recipe_chart);
+                updateSiloChart(d.raw_material_chart);
+            }
+        })
+        .catch(err => console.error("Dashboard API Error:", err));
+}
+
+/* =========================================================
+   SUMMARY CARDS UPDATE
+========================================================= */
+function updateSummary(s) {
+    document.getElementById("prod_today").innerText = s.total_production_tons;
+    document.getElementById("batch_count").innerText = s.num_batches;
+    document.getElementById("tph").innerText = s.tph;
+    document.getElementById("batch_acc").innerText = s.batch_accuracy + "%";
+    document.getElementById("cycle_time").innerText = s.avg_cycle_time;
+}
+
+/* =========================================================
+   LINE CHART UPDATE
+========================================================= */
+function updateLineChart(data) {
+    let ctx = lineChart ? lineChart.destroy() : document.getElementById("lineChart").getContext("2d");
+
+    lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: {
+            labels: data.map(d => d.Hour),
+            datasets: [{
+                label: "Batch Count",
+                data: data.map(d => d.BatchCount),
+                borderWidth: 2,
+                tension: 0.4
+            }]
+        }
+    });
+}
+
+/* =========================================================
+   DONUT CHART UPDATE
+========================================================= */
+function updateRecipeChart(data) {
+    if (recipeChart) recipeChart.destroy();
+
+    recipeChart = new Chart(document.getElementById("recipeChart"), {
+        type: "doughnut",
+        data: {
+            labels: data.map(d => d.RecipeName),
+            datasets: [{
+                data: data.map(d => d.Count)
+            }]
+        }
+    });
+}
+
+/* =========================================================
+   BAR CHART UPDATE
+========================================================= */
+function updateSiloChart(data) {
+    if (siloChart) siloChart.destroy();
+
+    siloChart = new Chart(document.getElementById("siloChart"), {
+        type: "bar",
+        data: {
+            labels: data.map(d => d.Category),
+            datasets: [
+                {
+                    label: "Actual Weight",
+                    data: data.map(d => d.ActualWeight)
+                },
+                {
+                    label: "Set Weight",
+                    data: data.map(d => d.SetWeight)
+                }
+            ]
+        }
+    });
+}
+
+/* =========================================================
+   INIT PAGE
+========================================================= */
+window.onload = loadFilters;
+
+</script>
+
 {% endblock %}
