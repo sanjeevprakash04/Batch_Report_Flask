@@ -565,7 +565,11 @@ def delete_row(index):
 
 @app.route('/report')
 def report():
-    return render_template('report.html')
+    user_logged_in = 'username' in session
+    username = session.get("username")     # <-- ADD THIS
+    user_role = session.get("role") 
+    
+    return render_template('report.html', user_logged_in=user_logged_in, username=username, role=user_role)
 
 @app.route('/api/report_data', methods=['POST'])
 def api_report_data():
@@ -575,6 +579,7 @@ def api_report_data():
         from_time = payload.get('from_time')
         to_time = payload.get('to_time')
 
+        
         print(f"📥 Received Filters → Hours: {hours}, From: {from_time}, To: {to_time}")
 
         result = main.data_process(hours, from_time, to_time)
@@ -726,6 +731,7 @@ def api_export_data():
 
 @app.route('/analytics')
 def analytics():
+    
     return redirect(url_for('analytics_tab', tab='data'))
 
 @app.route("/api/analytics_data", methods=["POST"])
@@ -742,6 +748,7 @@ def analytics_data():
       }
     """
     try:
+        
         payload = request.get_json() or {}
         hours = payload.get("hours", "1 Hr")
         from_time = payload.get("from_time")
@@ -1027,9 +1034,11 @@ def get_analytics_graph_data():
 @app.route('/analytics/<tab>')
 def analytics_tab(tab):
     user_logged_in = 'username' in session
+    username = session.get("username")     # <-- ADD THIS
+    user_role = session.get("role") 
     if tab == 'graph':
-        return render_template('analyticsgraph.html', tab='graph', user_logged_in=user_logged_in)
-    return render_template('analyticsdata.html', tab='data', user_logged_in=user_logged_in)
+        return render_template('analyticsgraph.html', tab='graph', user_logged_in=user_logged_in, username=username, role=user_role)
+    return render_template('analyticsdata.html', tab='data', user_logged_in=user_logged_in, username=username, role=user_role)
 
 @app.route('/settings')
 def settings():

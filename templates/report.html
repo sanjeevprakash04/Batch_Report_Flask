@@ -55,8 +55,8 @@
     </div>
 
     <div class="popup-footer">
-      <button id="downloadPDF" class="inv-button primary">Download PDF</button>
-      <button id="downloadExcel" class="inv-button success">Download Excel</button>
+      <button id="downloadPDF" class="inv-button primary" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %}>Download PDF</button>
+      <button id="downloadExcel" class="inv-button success" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %}>Download Excel</button>
       <button id="closePopup" class="inv-button warning">Close</button>
     </div>
   </div>
