@@ -42,7 +42,7 @@
     <div class="grid-item">
         <div class="summary-cards">
             <div class="card">
-                <h3>Today's Production</h3>
+                <h3>Production</h3>
                 <p class="value" id="prod_today">0</p>
                 <span class="unit">tons</span>
             </div>
@@ -71,7 +71,15 @@
         </div>
     </div>
 
-    <!-- ========== 2. Line Chart ========== -->
+    <!-- ========== 2. Donut Chart ========== -->
+     <div class="grid-item">
+        <div class="chart-box-recipe">
+            <h3 class="chart-title">Recipe</h3>
+            <canvas id="recipeChart"></canvas>
+        </div>
+    </div>
+
+    <!-- ========== 3. Line Chart ========== -->
     <div class="grid-item">
         <div class="chart-box">
             <h3 class="chart-title">Production Line</h3>
@@ -79,13 +87,8 @@
         </div>
     </div>
 
-    <!-- ========== 3. Recipe Pie Chart ========== -->
-    <div class="grid-item">
-        <div class="chart-box">
-            <h3 class="chart-title">Recipe</h3>
-            <canvas id="recipeChart"></canvas>
-        </div>
-    </div>
+    
+    
 
     <!-- ========== 4. Bar Chart ========== -->
     <div class="grid-item">
@@ -120,6 +123,15 @@ function loadFilters() {
     const from = localStorage.getItem("dash_from");
     const to = localStorage.getItem("dash_to");
     const hours = localStorage.getItem("dash_hours");
+
+    // --- If no filter saved → load your default dates ---
+    if (!from || !to) {
+        from = "2020-03-01T00:00";
+        to   = "2025-04-30T23:59";
+
+        // Save defaults to localStorage
+        saveFilters(from, to, "Custom");
+    }
 
     if (from) document.getElementById("fromDate").value = from;
     if (to) document.getElementById("toDate").value = to;
