@@ -120,25 +120,54 @@ function saveFilters(from, to, hours) {
    LOAD FILTERS ON PAGE LOAD
 ========================================================= */
 function loadFilters() {
-    const from = localStorage.getItem("dash_from");
-    const to = localStorage.getItem("dash_to");
-    const hours = localStorage.getItem("dash_hours");
+    let from = localStorage.getItem("dash_from");
+    let to = localStorage.getItem("dash_to");
+    let hours = localStorage.getItem("dash_hours");
 
-    // --- If no filter saved → load your default dates ---
+    // --- If no saved filters → apply default values ---
     if (!from || !to) {
         from = "2020-03-01T00:00";
         to   = "2025-04-30T23:59";
 
-        // Save defaults to localStorage
         saveFilters(from, to, "Custom");
     }
 
-    if (from) document.getElementById("fromDate").value = from;
-    if (to) document.getElementById("toDate").value = to;
-    if (hours) document.getElementById("hourSelect").value = hours;
+    // Apply to UI
+    document.getElementById("fromDate").value = from;
+    document.getElementById("toDate").value = to;
+    document.getElementById("hourSelect").value = hours || "Custom";
 
-    if (from && to) fetchDashboard(from, to);
+    // Always load dashboard initially
+    fetchDashboard(from, to);
 }
+
+/* =========================================================
+   WHEN USER CHANGES DATE → FORCE CUSTOM
+========================================================= */
+fromDate.addEventListener("change", () => {
+    hourSelect.value = "Custom";
+    applyManual();
+});
+
+toDate.addEventListener("change", () => {
+    hourSelect.value = "Custom";
+    applyManual();
+});
+
+/* =========================================================
+   WHEN USER CHANGES HOURS
+========================================================= */
+hourSelect.addEventListener("change", () => {
+    if (hourSelect.value !== "Custom") {
+        fromDate.value = "";
+        toDate.value = "";
+    } else {
+        // Keep current values and apply filters
+        if (fromDate.value && toDate.value) {
+            applyManual();
+        }
+    }
+});
 
 /* =========================================================
    LIMIT DATE PICKER TO CURRENT TIME

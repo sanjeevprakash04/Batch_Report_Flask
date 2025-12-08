@@ -98,6 +98,7 @@ def get_dashboard():
             "status": "error",
             "message": str(e)
         }), 500
+    
 @app.route('/logs')
 def logs():
     return render_template('logs.html')
