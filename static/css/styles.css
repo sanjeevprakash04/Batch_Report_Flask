@@ -15,12 +15,7 @@ body {
   overflow-y: auto;
   font-family: Arial, sans-serif;
 }
-.dashboard-content .upper .upper-left, .dashboard-content .upper .upper-right, .dashboard-content .lower .lower-left, .dashboard-content .lower .lower-right {
-    display: flex;
-    justify-content: center;   /* horizontal center */
-    align-items: center;       /* vertical center */
-    text-align: center;
-}
+
 
 /* ==============================
    GLOBAL GRID
@@ -28,18 +23,23 @@ body {
 .dashboard-grid {
     padding: 20px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
     gap: 24px;
 }
 
+/* Full width items */
+.grid-item {
+    width: 100%;
+}
 /* ==============================
    SUMMARY CARDS (3 on top, 2 below)
 ============================== */
 .summary-cards {
     display: flex;
-    gap: 20px 28px; 
-    justify-items: center;
+    flex-wrap: wrap;
+    gap: 20px 28px;
+    justify-content: left;
 }
 
 .summary-cards .card {
@@ -53,26 +53,24 @@ body {
     transition: 0.25s ease-in-out;
 }
 
-.card:hover {
+.summary-cards .card:hover {
     transform: translateY(-4px);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
-.card h3 {
+.summary-cards .card h3 {
     font-size: 14px;
     color: #6b7280;
     font-weight: 600;
 }
 
-/* Default value style */
-.card .value {
+.summary-cards .card .value {
     font-size: 32px;
     font-weight: 700;
     margin-top: 8px;
 }
 
-/* Unit text */
-.card .unit {
+.summary-cards .card .unit {
     font-size: 12px;
     color: #9da3af;
     margin-top: -6px;
@@ -82,23 +80,24 @@ body {
    SPECIAL COLOR STYLING
 ============================== */
 
-/* 1️⃣ Today's Production → value orange */
+/* 1️⃣ Today's Production → orange value */
 .summary-cards .card:nth-child(1) .value {
     color: #ff7a00;
 }
 
-/* 2️⃣ No. of Batches → blue background + white font */
+/* 2️⃣ No. of Batches → blue card */
 .summary-cards .card:nth-child(2) {
     background: #007bff;
     color: white;
 }
 
 .summary-cards .card:nth-child(2) h3,
-.summary-cards .card:nth-child(2) .value {
+.summary-cards .card:nth-child(2) .value,
+.summary-cards .card:nth-child(2) .unit {
     color: white !important;
 }
 
-/* 3️⃣ Tons per Hour → green background + white font */
+/* 3️⃣ Tons per Hour → green card */
 .summary-cards .card:nth-child(3) {
     background: #22c55e;
     color: white;
@@ -110,12 +109,12 @@ body {
     color: white !important;
 }
 
-/* 4️⃣ Batch Accuracy → blue font */
+/* 4️⃣ Batch Accuracy → blue text */
 .summary-cards .card:nth-child(4) .value {
     color: #007bff;
 }
 
-/* 5️⃣ Avg Batch Cycle Time → yellow font */
+/* 5️⃣ Avg Cycle Time → yellow text */
 .summary-cards .card:nth-child(5) .value {
     color: #ffd000;
 }
@@ -129,10 +128,20 @@ body {
     border-radius: 16px;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
     border: 1px solid #f3f4f6;
+    width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
+    min-height: 400px;   /* <— responsive */
+    overflow: hidden;    /* <— this keeps charts inside */
 }
+
+
+
+
+/* FORCE fixed height so graphs look consistent */
+.chart-box {
+    height: 450px;
+}
+
 
 .chart-title {
     margin-bottom: 18px;
@@ -141,12 +150,16 @@ body {
     color: #374151;
 }
 
-/* Canvas size (similar to reference) */
+/* Canvas (general) */
 canvas {
     width: 100% !important;
-    height: 360px !important;
+    height: 100% !important;
 }
 
+
+/* ==============================
+   RECIPE PIE CHART BOX
+============================== */
 .chart-box-recipe {
     background: #ffffff;
     padding: 22px;
@@ -154,24 +167,35 @@ canvas {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
     border: 1px solid #f3f4f6;
 
-    /* 🔥 Force square layout */
-    width: 70%;
-    aspect-ratio: 1 / 1;  /* <-- FIXES OVAL SHAPE */
-    
+    width: 55%;  
+
+
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    margin-right: auto;      /* Keep it left aligned */
 }
 
-.chart-box-recipe canvas {
+/* Title inside recipe box */
+.chart-box-recipe .chart-title {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 15px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+}
+
+/* 🔥 FIXED: Recipe chart sizing */
+#recipeChart {
     width: 100% !important;
     height: 100% !important;
-}
 
-#recipeChart {
-    max-width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
-
-.chart-box-recipe { margin-left: auto; }
 
 
 /* ==============================

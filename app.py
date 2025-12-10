@@ -70,35 +70,30 @@ def dashboard():
 def get_dashboard():
 
     try:
-        # Read query parameters
         start_time = request.args.get("start_time")
         end_time = request.args.get("end_time")
 
-        # Validate missing values
         if not start_time or not end_time:
             return jsonify({
                 "status": "error",
                 "message": "start_time and end_time are required"
             }), 400
 
-        # Convert to datetime
         s_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         e_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
-        # Your calculation function
-        result = main.dashboard_calculations(s_time, e_time)
+        # FIX → NO NESTED JSON
+        data = main.dashboard_calculations(s_time, e_time)
 
-        return jsonify({
-            "status": "success",
-            "data": result
-        })
+        return jsonify(data)
 
     except Exception as e:
         return jsonify({
             "status": "error",
             "message": str(e)
         }), 500
-    
+
+
 @app.route('/logs')
 def logs():
     return render_template('logs.html')
@@ -1014,6 +1009,10 @@ def get_analytics_graph_data():
         engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
 
         df = sqliteCon.show_data(conn, hours, from_time, to_time, engineConRead)
+
+        if df is None or df.empty:
+            return jsonify({"error": "No data found"})
+        
         df_diff = sqliteCon.process_batch_data(df)
 
         if df_diff is None or df_diff.empty:
@@ -1029,7 +1028,7 @@ def get_analytics_graph_data():
         })
     except Exception as e:
         print("❌ Graph API error:", e)
-        return jsonify({"error": str(e)})
+        return jsonify({"error": "No data found"})
 
 
 @app.route('/analytics/<tab>')
@@ -1479,4 +1478,4 @@ def inject_user():
 
 if __name__ == '__main__':
     # Timer(1, open_browser).start()
-    app.run()
+    app.run(debug=True)

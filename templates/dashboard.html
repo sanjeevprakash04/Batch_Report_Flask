@@ -2,7 +2,9 @@
 {% block content %}
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Load Google Charts -->
+<script src="https://www.gstatic.com/charts/loader.js"></script>
 
 <div class="inv-navbar">
     <div class="inv-navbar-left">
@@ -33,12 +35,11 @@
     </div>
 </div>
 
-<!-- ============================
-     2x2 GRID LAYOUT
-=============================== -->
+
+<!-- GRID -->
 <div class="dashboard-grid">
 
-    <!-- ========== 1. Summary Cards ========== -->
+    <!-- Summary Cards -->
     <div class="grid-item">
         <div class="summary-cards">
             <div class="card">
@@ -71,30 +72,36 @@
         </div>
     </div>
 
-    <!-- ========== 2. Donut Chart ========== -->
-     <div class="grid-item">
+    <!-- Donut Chart -->
+    <div class="grid-item">
         <div class="chart-box-recipe">
             <h3 class="chart-title">Recipe</h3>
-            <canvas id="recipeChart"></canvas>
+            <div id="recipeChart"></div>
         </div>
     </div>
 
-    <!-- ========== 3. Line Chart ========== -->
+    <!-- Calendar Chart -->
+    <div class="grid-item">
+        <div class="chart-box" >
+            <h3 class="chart-title">Daily Production Calendar</h3>
+            <div id="calendarChart" style="height: 350px;"></div>
+        </div>
+    </div>
+
+
+    <!-- Line Chart -->
     <div class="grid-item">
         <div class="chart-box">
             <h3 class="chart-title">Production Line</h3>
-            <canvas id="lineChart"></canvas>
+            <div id="lineChart"></div>
         </div>
     </div>
 
-    
-    
-
-    <!-- ========== 4. Bar Chart ========== -->
+    <!-- Bar Chart -->
     <div class="grid-item">
         <div class="chart-box">
             <h3 class="chart-title">Raw Material Consumption</h3>
-            <canvas id="siloChart"></canvas>
+            <div id="siloChart"></div>
         </div>
     </div>
 
@@ -102,48 +109,37 @@
 
 
 <script>
-/* =========================================================
-   GLOBAL CHART INSTANCES
-========================================================= */
-let lineChart, recipeChart, siloChart;
+google.charts.load('current', {packages: ['corechart', 'calendar']});
 
-/* =========================================================
-   SAVE FILTERS TO LOCAL STORAGE
-========================================================= */
+/* =========================
+   FILTER SAVE / LOAD
+========================= */
 function saveFilters(from, to, hours) {
     localStorage.setItem("dash_from", from);
     localStorage.setItem("dash_to", to);
     localStorage.setItem("dash_hours", hours);
 }
 
-/* =========================================================
-   LOAD FILTERS ON PAGE LOAD
-========================================================= */
 function loadFilters() {
     let from = localStorage.getItem("dash_from");
     let to = localStorage.getItem("dash_to");
     let hours = localStorage.getItem("dash_hours");
 
-    // --- If no saved filters → apply default values ---
     if (!from || !to) {
         from = "2020-03-01T00:00";
-        to   = "2025-04-30T23:59";
-
+        to = "2025-04-30T23:59";
         saveFilters(from, to, "Custom");
     }
 
-    // Apply to UI
-    document.getElementById("fromDate").value = from;
-    document.getElementById("toDate").value = to;
-    document.getElementById("hourSelect").value = hours || "Custom";
-
-    // Always load dashboard initially
+    fromDate.value = from;
+    toDate.value = to;
+    hourSelect.value = hours || "Custom";
     fetchDashboard(from, to);
 }
 
-/* =========================================================
-   WHEN USER CHANGES DATE → FORCE CUSTOM
-========================================================= */
+/* =========================
+   USER INPUT CHANGE
+========================= */
 fromDate.addEventListener("change", () => {
     hourSelect.value = "Custom";
     applyManual();
@@ -154,63 +150,26 @@ toDate.addEventListener("change", () => {
     applyManual();
 });
 
-/* =========================================================
-   WHEN USER CHANGES HOURS
-========================================================= */
 hourSelect.addEventListener("change", () => {
     if (hourSelect.value !== "Custom") {
         fromDate.value = "";
         toDate.value = "";
-    } else {
-        // Keep current values and apply filters
-        if (fromDate.value && toDate.value) {
-            applyManual();
-        }
     }
 });
 
-/* =========================================================
-   LIMIT DATE PICKER TO CURRENT TIME
-========================================================= */
-const now = new Date().toISOString().slice(0, 16);
-document.getElementById("fromDate").max = now;
-document.getElementById("toDate").max = now;
-
-/* =========================================================
-   WHEN USER CLICKS DATE → SWITCH TO CUSTOM
-========================================================= */
-fromDate.addEventListener("click", () => hourSelect.value = "Custom");
-toDate.addEventListener("click", () => hourSelect.value = "Custom");
-
-/* =========================================================
-   AUTO HANDLE HOUR SELECTION
-========================================================= */
-hourSelect.addEventListener("change", () => {
-  if (hourSelect.value !== "Custom") {
-    fromDate.value = "";
-    toDate.value = "";
-  }
-});
-
-/* =========================================================
-   MANUAL DATE CHANGE
-========================================================= */
+/* =========================
+   APPLY FILTER
+========================= */
 function applyManual() {
-    let from = fromDate.value;
-    let to = toDate.value;
-
-    if (from && to) {
-        saveFilters(from, to, "Custom");
-        fetchDashboard(from, to);
+    if (fromDate.value && toDate.value) {
+        saveFilters(fromDate.value, toDate.value, "Custom");
+        fetchDashboard(fromDate.value, toDate.value);
     }
 }
 
-fromDate.addEventListener("change", applyManual);
-toDate.addEventListener("change", applyManual);
-
-/* =========================================================
-   REQUEST DASHBOARD API
-========================================================= */
+/* =========================
+   FETCH DASHBOARD DATA
+========================= */
 function fetchDashboard(from, to) {
     let start = from.replace("T", " ") + ":00";
     let end = to.replace("T", " ") + ":00";
@@ -218,95 +177,188 @@ function fetchDashboard(from, to) {
     fetch(`/api/dashboard?start_time=${start}&end_time=${end}`)
         .then(res => res.json())
         .then(api => {
+
             if (api.status === "success") {
-                const d = api.data;  // backend returns {status, data}
+
+                const d = api;  // <<< FIXED LINE
 
                 updateSummary(d.summary);
-                updateLineChart(d.line_chart);
-                updateRecipeChart(d.recipe_chart);
-                updateSiloChart(d.raw_material_chart);
+
+                google.charts.setOnLoadCallback(() => {
+                    drawLineChart(d.line_chart);
+                    drawRecipeChart(d.recipe_chart);
+                    drawSiloChart(d.raw_material_chart);
+                    drawCalendarChart(d.calendar_chart);  // <-- ADD THIS
+                });
+
             }
-        })
-        .catch(err => console.error("Dashboard API Error:", err));
+        });
 }
 
-/* =========================================================
-   SUMMARY CARDS UPDATE
-========================================================= */
+/* =========================
+   SUMMARY CARDS
+========================= */
 function updateSummary(s) {
-    document.getElementById("prod_today").innerText = s.total_production_tons;
-    document.getElementById("batch_count").innerText = s.num_batches;
-    document.getElementById("tph").innerText = s.tph;
-    document.getElementById("batch_acc").innerText = s.batch_accuracy + "%";
-    document.getElementById("cycle_time").innerText = s.avg_cycle_time;
+    prod_today.innerText = s.total_production_tons;
+    batch_count.innerText = s.num_batches;
+    tph.innerText = s.tph;
+    batch_acc.innerText = s.batch_accuracy + "%";
+    cycle_time.innerText = s.avg_cycle_time;
 }
 
-/* =========================================================
-   LINE CHART UPDATE
-========================================================= */
-function updateLineChart(data) {
-    let ctx = lineChart ? lineChart.destroy() : document.getElementById("lineChart").getContext("2d");
+/* =========================
+   LINE CHART (ERROR PROOF)
+========================= */
+function drawLineChart(data) {
 
-    lineChart = new Chart(document.getElementById("lineChart"), {
-        type: "line",
-        data: {
-            labels: data.map(d => d.Hour),
-            datasets: [{
-                label: "Batch Count",
-                data: data.map(d => d.BatchCount),
-                borderWidth: 2,
-                tension: 0.4
-            }]
+    if (!data || data.length === 0) {
+        document.getElementById('lineChart').innerHTML =
+            "<p style='text-align:center;color:#888;'>No data available</p>";
+        return;
+    }
+
+    let table = new google.visualization.DataTable();
+    table.addColumn('date', 'Time');
+    table.addColumn('number', 'Batch Count');
+
+    data.forEach(r => {
+        let dt = new Date(r.Hour);  
+        table.addRow([dt, r.BatchCount]);
+    });
+
+    let firstLabel = String(data[0].Hour);
+    let isHourly = firstLabel.includes(":");
+    let xTitle = isHourly ? "Hour" : "Date";
+
+    // Date formatter
+    let formatter = new google.visualization.DateFormat({
+        pattern: isHourly ? "MMM d, HH:mm" : "MMM d yyyy"
+    });
+    formatter.format(table, 0);
+
+    let interval = Math.ceil(data.length / 8);
+
+    let chart = new google.visualization.LineChart(document.getElementById('lineChart'));
+
+    chart.draw(table, {
+        curveType: 'function',
+        height: 330,
+        legend: { position: 'bottom' },
+
+        hAxis: {
+            title: xTitle,
+            slantedText: true,
+            slantedTextAngle: 45,
+            textStyle: { fontSize: 10 },
+            maxAlternation: 1,
+            maxTextLines: 1,
+            showTextEvery: interval,
+            viewWindowMode: "explicit",
+            viewWindow: {
+                min: new Date(data[0].Hour),
+                max: new Date(data[data.length - 1].Hour)
+            }
+        },
+
+
+        vAxis: { viewWindow: { min: 0 } }
+    });
+}
+
+/* =========================
+   DONUT CHART
+========================= */
+function drawRecipeChart(data) {
+
+    if (!data || data.length === 0) {
+        document.getElementById('recipeChart').innerHTML =
+            "<p style='text-align:center;color:#888;'>No data available</p>";
+        return;
+    }
+
+    let table = new google.visualization.DataTable();
+    table.addColumn('string', 'Recipe');
+    table.addColumn('number', 'Count');
+
+    data.forEach(r => {
+        let label = `${r.RecipeName} (${r.Count} batches)`;
+        table.addRow([label, r.Count]);
+    });
+
+
+    let chart = new google.visualization.PieChart(document.getElementById('recipeChart'));
+    chart.draw(table, {
+        pieHole: 0.45,
+        height: 330
+    });
+}
+
+
+/* =========================
+   CALENDAR CHART
+========================= */
+
+function drawCalendarChart(data) {
+
+    if (!data || data.length === 0) {
+        document.getElementById('calendarChart').innerHTML =
+            "<p style='text-align:center;color:#888;'>No data available</p>";
+        return;
+    }
+
+    let table = new google.visualization.DataTable();
+    table.addColumn({ type: 'date', id: 'Date' });
+    table.addColumn({ type: 'number', id: 'Value' });
+
+    data.forEach(r => {
+        let d = new Date(r.date);
+        table.addRow([
+            new Date(d.getFullYear(), d.getMonth(), d.getDate()), 
+            r.value
+        ]);
+    });
+
+    let chart = new google.visualization.Calendar(document.getElementById('calendarChart'));
+
+    chart.draw(table, {
+        title: "Daily Production",
+        height: 350,
+        calendar: {
+            cellSize: 18,
+            yearLabel: { fontSize: 16, color: "#444" },
+            dayOfWeekLabel: { fontSize: 12 },
+            monthLabel: { fontSize: 14 }
         }
     });
 }
 
-/* =========================================================
-   DONUT CHART UPDATE
-========================================================= */
-function updateRecipeChart(data) {
-    if (recipeChart) recipeChart.destroy();
 
-    recipeChart = new Chart(document.getElementById("recipeChart"), {
-        type: "doughnut",
-        data: {
-            labels: data.map(d => d.RecipeName),
-            datasets: [{
-                data: data.map(d => d.Count)
-            }]
-        }
+/* =========================
+   BAR CHART
+========================= */
+function drawSiloChart(data) {
+
+    if (!data || data.length === 0) {
+        document.getElementById('siloChart').innerHTML =
+            "<p style='text-align:center;color:#888;'>No data available</p>";
+        return;
+    }
+
+    let table = new google.visualization.DataTable();
+    table.addColumn('string', 'Category');
+    table.addColumn('number', 'Actual');
+    table.addColumn('number', 'Set');
+
+    data.forEach(r => table.addRow([r.Category, r.ActualWeight, r.SetWeight]));
+
+    let chart = new google.visualization.ColumnChart(document.getElementById('siloChart'));
+    chart.draw(table, {
+        height: 330,
+        legend: { position: 'top' }
     });
 }
 
-/* =========================================================
-   BAR CHART UPDATE
-========================================================= */
-function updateSiloChart(data) {
-    if (siloChart) siloChart.destroy();
-
-    siloChart = new Chart(document.getElementById("siloChart"), {
-        type: "bar",
-        data: {
-            labels: data.map(d => d.Category),
-            datasets: [
-                {
-                    label: "Actual Weight",
-                    data: data.map(d => d.ActualWeight)
-                },
-                {
-                    label: "Set Weight",
-                    data: data.map(d => d.SetWeight)
-                }
-            ]
-        }
-    });
-}
-
-/* =========================================================
-   INIT PAGE
-========================================================= */
 window.onload = loadFilters;
-
 </script>
 
 {% endblock %}

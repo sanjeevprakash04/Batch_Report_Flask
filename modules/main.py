@@ -193,99 +193,148 @@ def report_data_process(batch_no):
 
 def dashboard_calculations(start_timestamp, end_timestamp):
     try:
+        print("Dashboard calculations called")
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
         engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
 
-        # ===============================
-        # 1. READ PLC DATA
-        # ===============================
+        # Ensure datetimes
+        start_dt = pd.to_datetime(start_timestamp)
+        end_dt = pd.to_datetime(end_timestamp)
+        time_diff_hours = (end_dt - start_dt).total_seconds() / 3600.0
+        print(f" Time difference in hours: {time_diff_hours}")
+
+        # --------------------- PLC DATA ---------------------
         query_plc = f"""
             SELECT *
             FROM plc_data
-            WHERE TimeStamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+            WHERE TimeStamp BETWEEN '{start_dt}' AND '{end_dt}'
         """
         df_plc = pd.read_sql_query(query_plc, engineConRead)
 
         if df_plc.empty:
-            return {"status": "error", "message": "No PLC data found"}
+            print("No PLC data found in range")
+            return {
+                "status": "success",
+                "summary": {},
+                "line_chart": [],
+                "recipe_chart": [],
+                "raw_material_chart": [],
+                "calendar_chart": []
+            }
 
-        # ===============================
-        # 2. READ BATCH LOGS
-        # ===============================
+        # --------------------- BATCH LOGS ---------------------
         query_batches = f"""
             SELECT *
             FROM Batches
-            WHERE TimeStamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+            WHERE TimeStamp BETWEEN '{start_dt}' AND '{end_dt}'
         """
         df_batches = pd.read_sql_query(query_batches, engineConRead)
 
+        # Full table for calendar chart
+        query_calander = "SELECT * FROM Batches"
+        df_calander = pd.read_sql_query(query_calander, engineConRead)
+
         if df_batches.empty:
-            return {"status": "error", "message": "No batch records found"}
+            print("No batch data found in range")
+            return {
+                "status": "success",
+                "summary": {},
+                "line_chart": [],
+                "recipe_chart": [],
+                "raw_material_chart": [],
+                "calendar_chart": []
+            }
 
+        # normalize timestamps
         df_batches["TimeStamp"] = pd.to_datetime(df_batches["TimeStamp"], errors="coerce")
-        df_batches["Hour"] = df_batches["TimeStamp"].dt.floor("h")  # FIXED: no warning
+        df_batches = df_batches.dropna(subset=["TimeStamp"])
 
-        # ============================================================
-        # LINE CHART: HOURLY BATCH COUNTS 
-        # ============================================================
-        batch_counts_per_hr = (
-            df_batches.groupby("Hour")["BatchNo"]
-            .nunique()
-            .reset_index(name="BatchCount")
-        )
+        # ------------------ LINE CHART LOGIC ------------------
+        if time_diff_hours < 24:
+            df_batches["Hour"] = df_batches["TimeStamp"].dt.floor("H")
+            grouped = (
+                df_batches.groupby("Hour")["BatchNo"]
+                .nunique()
+                .reset_index(name="BatchCount")
+                .sort_values("Hour")
+            )
+            grouped["Hour"] = grouped["Hour"].dt.strftime("%H:00")
+        else:
+            df_batches["Hour"] = df_batches["TimeStamp"].dt.date
+            grouped = (
+                df_batches.groupby("Hour")["BatchNo"]
+                .nunique()
+                .reset_index(name="BatchCount")
+                .sort_values("Hour")
+            )
+            grouped["Hour"] = grouped["Hour"].astype(str)
 
-        batch_counts_per_hr["Hour"] = batch_counts_per_hr["Hour"].astype(str)
+        print("Grouped counts (preview):")
+        print(grouped.head(10))
 
-        # ============================================================
-        # SUMMARY
-        # ============================================================
-        df_prod = df_plc[df_plc["Name"] == "TotalBatchActualWeight"].copy()
-        total_production_tons = round(df_prod["Value"].sum() / 1000.0, 2)
+        # ---------------------- SUMMARY -----------------------
+        df_prod = df_plc[df_plc["Name"] == "TotalBatchActualWeight"]
+        total_production_tons = round(df_prod["Value"].sum() / 1000.0, 2) if not df_prod.empty else 0.0
 
-        number_of_batches = int((df_plc["Name"] == "Recipe Name").sum())
+        number_of_batches = int(df_batches["BatchNo"].nunique()) if "BatchNo" in df_batches.columns else 0
 
-        tph = int(batch_counts_per_hr["BatchCount"].max()) if not batch_counts_per_hr.empty else 0
+        elapsed_hours = time_diff_hours if time_diff_hours > 0 else 1.0
+        tph = round(total_production_tons / elapsed_hours, 2)
 
-        df_acc = df_plc[df_plc["Name"] == "BatchAccuracy"].copy()
-        batch_accuracy = round(df_acc["Value"].mean(), 2) if not df_acc.empty else 0.0
+        df_acc = df_plc[df_plc["Name"] == "BatchAccuracy"]
+        batch_accuracy = round(pd.to_numeric(df_acc["Value"], errors="coerce").mean(), 2) if not df_acc.empty else 0.0
 
-        df_cycle = df_plc[df_plc["Name"] == "BatchTimeMinutes"].copy()
-        avg_cycle_time = round(df_cycle["Value"].mean(), 2) if not df_cycle.empty else 0.0
+        df_cycle = df_plc[df_plc["Name"] == "BatchTimeMinutes"]
+        avg_cycle_time = round(pd.to_numeric(df_cycle["Value"], errors="coerce").mean(), 2) if not df_cycle.empty else 0.0
 
-        # ============================================================
-        # BAR CHART — RAW MATERIAL
-        # ============================================================
-        df_filtered = df_plc[~df_plc["Category"].isin(["Info", "Summary"])].copy()
+        # --------------------- RAW MATERIAL -------------------
+        df_filtered = df_plc[~df_plc["Category"].isin(["Info", "Summary"])]
         weights_df = df_filtered[df_filtered["Name"].isin(["ActualWeight", "SetWeight"])].copy()
 
-        # FIXED: SettingWithCopyWarning
-        weights_df.loc[:, "Value"] = pd.to_numeric(weights_df["Value"], errors="coerce")
-
-        pivot_bar = (
-            weights_df.pivot_table(
-                index="Category",
-                columns="Name",
-                values="Value",
-                aggfunc="mean",
-                fill_value=0
+        if not weights_df.empty:
+            weights_df["Value"] = pd.to_numeric(weights_df["Value"], errors="coerce")
+            pivot_bar = (
+                weights_df.pivot_table(
+                    index="Category", 
+                    columns="Name", 
+                    values="Value",
+                    aggfunc="mean", 
+                    fill_value=0
+                ).reset_index()
             )
-            .reset_index()
+        else:
+            pivot_bar = pd.DataFrame(columns=["Category", "ActualWeight", "SetWeight"])
+
+        # --------------------- RECIPE CHART -------------------
+        recipe_df = df_plc[df_plc["Name"] == "Recipe Name"]
+
+        if not recipe_df.empty:
+            recipe_counts = recipe_df["Value"].value_counts().reset_index()
+            recipe_counts.columns = ["RecipeName", "Count"]
+        else:
+            recipe_counts = pd.DataFrame(columns=["RecipeName", "Count"])
+
+        # --------------------- CALENDAR CHART -------------------
+        df_calander["TimeStamp"] = pd.to_datetime(df_calander["TimeStamp"], errors="coerce")
+        df_calander = df_calander.dropna(subset=["TimeStamp"])
+
+        # Group by only DATE
+        df_calander["DateOnly"] = df_calander["TimeStamp"].dt.date
+
+        calendar_group = (
+            df_calander.groupby("DateOnly")["BatchNo"]
+            .nunique()
+            .reset_index(name="Value")
+            .sort_values("DateOnly")
         )
 
-        bar_chart_data = pivot_bar.to_dict(orient="records")
+        # Format for frontend
+        calendar_chart = [
+            {"date": str(row["DateOnly"]), "value": int(row["Value"])}
+            for _, row in calendar_group.iterrows()
+        ]
 
-        # ============================================================
-        # DONUT CHART — RECIPE %
-        # ============================================================
-        recipe_df = df_plc[df_plc["Name"] == "Recipe Name"].copy()
-        recipe_counts = recipe_df["Value"].value_counts().reset_index()
-        recipe_counts.columns = ["RecipeName", "Count"]
-
-        recipe_chart_data = recipe_counts.to_dict(orient="records")
-
-        # ============================================================
-        # FINAL JSON
-        # ============================================================
+        # --------------------- FINAL JSON ---------------------
         return {
             "status": "success",
             "summary": {
@@ -295,13 +344,16 @@ def dashboard_calculations(start_timestamp, end_timestamp):
                 "batch_accuracy": batch_accuracy,
                 "avg_cycle_time": avg_cycle_time
             },
-            "line_chart": batch_counts_per_hr.to_dict(orient="records"),
-            "recipe_chart": recipe_chart_data,
-            "raw_material_chart": bar_chart_data
+            "line_chart": grouped.to_dict(orient="records"),
+            "recipe_chart": recipe_counts.to_dict(orient="records"),
+            "raw_material_chart": pivot_bar.to_dict(orient="records"),
+            "calendar_chart": calendar_chart     # <---- ADDED HERE
         }
 
     except Exception as e:
-        print("❌ Error in dashboard_calculations:", e)
+        print("Error:", e)
         return {"status": "error", "message": str(e)}
+
+
 
 
