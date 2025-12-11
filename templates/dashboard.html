@@ -83,7 +83,7 @@
     <!-- Calendar Chart -->
     <div class="grid-item">
         <div class="chart-box" >
-            <h3 class="chart-title">Daily Production Calendar</h3>
+            <h3 class="chart-title">Production Calendar</h3>
             <div id="calendarChart" style="height: 350px;"></div>
         </div>
     </div>
@@ -219,30 +219,33 @@ function drawLineChart(data) {
 
     let table = new google.visualization.DataTable();
     table.addColumn('date', 'Time');
-    table.addColumn('number', 'Batch Count');
+    table.addColumn('number', 'Batch Weight (Kg)');
 
     data.forEach(r => {
-        let dt = new Date(r.Hour);  
+        let dt = new Date(r.Hour);
         table.addRow([dt, r.BatchCount]);
     });
 
     let firstLabel = String(data[0].Hour);
     let isHourly = firstLabel.includes(":");
-    let xTitle = isHourly ? "Hour" : "Date";
+    let xTitle = isHourly ? "Time" : "Date";
 
-    // Date formatter
     let formatter = new google.visualization.DateFormat({
-        pattern: isHourly ? "MMM d, HH:mm" : "MMM d yyyy"
+        pattern: isHourly ? "HH:mm" : "MMM d yyyy"
     });
     formatter.format(table, 0);
 
-    let interval = Math.ceil(data.length / 8);
+    let interval = Math.max(1, Math.ceil(data.length / 10));
 
     let chart = new google.visualization.LineChart(document.getElementById('lineChart'));
 
     chart.draw(table, {
+
         curveType: 'function',
+        pointSize: 5,                   // 🔥 Data point visible
+        dataOpacity: 0.9,
         height: 330,
+
         legend: { position: 'bottom' },
 
         hAxis: {
@@ -250,20 +253,23 @@ function drawLineChart(data) {
             slantedText: true,
             slantedTextAngle: 45,
             textStyle: { fontSize: 10 },
-            maxAlternation: 1,
-            maxTextLines: 1,
             showTextEvery: interval,
-            viewWindowMode: "explicit",
-            viewWindow: {
-                min: new Date(data[0].Hour),
-                max: new Date(data[data.length - 1].Hour)
-            }
+            gridlines: { count: -1 }
         },
 
+        vAxis: {
+            title: "Batch Weight (Kg)",   // 🔥 Updated label
+            viewWindow: { min: 0 },
+            textStyle: { fontSize: 11 }
+        },
 
-        vAxis: { viewWindow: { min: 0 } }
+        tooltip: {
+            trigger: 'both',             // 🔥 Tooltip on hover + click
+            isHtml: true
+        }
     });
 }
+
 
 /* =========================
    DONUT CHART
@@ -281,16 +287,21 @@ function drawRecipeChart(data) {
     table.addColumn('number', 'Count');
 
     data.forEach(r => {
-        let label = `${r.RecipeName} (${r.Count} batches)`;
+        let label = `${r.RecipeName} - (${r.Count} batches)`;
         table.addRow([label, r.Count]);
     });
 
 
     let chart = new google.visualization.PieChart(document.getElementById('recipeChart'));
     chart.draw(table, {
-        pieHole: 0.45,
-        height: 330
-    });
+        pieHole: 0.80,
+        height: 330,
+        pieSliceText: "none",
+        legend: { position: 'right', alignment: 'center'}
+        
+    }
+    
+);
 }
 
 
@@ -321,7 +332,6 @@ function drawCalendarChart(data) {
     let chart = new google.visualization.Calendar(document.getElementById('calendarChart'));
 
     chart.draw(table, {
-        title: "Daily Production",
         height: 350,
         calendar: {
             cellSize: 18,

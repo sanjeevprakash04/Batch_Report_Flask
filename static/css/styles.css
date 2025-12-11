@@ -137,6 +137,7 @@ body {
 
 
 
+
 /* FORCE fixed height so graphs look consistent */
 .chart-box {
     height: 450px;
@@ -167,7 +168,7 @@ canvas {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
     border: 1px solid #f3f4f6;
 
-    width: 55%;  
+    width: 100%;  
 
 
     display: flex;
@@ -189,6 +190,14 @@ canvas {
 
 /* 🔥 FIXED: Recipe chart sizing */
 #recipeChart {
+    width: 55% !important;
+    height: 100% !important;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#calendarChart {
     width: 100% !important;
     height: 100% !important;
 
