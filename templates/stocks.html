@@ -263,13 +263,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const res = await fetch("/api/stocks/export", { method: "POST" });
     const blob = await res.blob();
 
+    // Get current date & time
+    const now = new Date();
+
+    const currentDate = now.toISOString()
+      .slice(0, 16)        // YYYY-MM-DDTHH:MM
+      .replace("T", "_")   // YYYY-MM-DD_HH:MM
+      .replace(/:/g, "-"); // safe filename
+
+    const filename = `SKEW_Stocks_${currentDate}.xlsx`;
+
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "MaterialData.xlsx";
+    a.download = filename;
     a.click();
+
+    URL.revokeObjectURL(a.href);
   });
 
   loadStocks();
+
 });
 </script>
 

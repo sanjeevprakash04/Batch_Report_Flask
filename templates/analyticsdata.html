@@ -17,11 +17,11 @@
 
     <div class="date-filter">
       <span>From:</span>
-      <input type="datetime-local" id="fromDate" class="inv-input">
+      <input type="datetime-local" id="fromDate" class="inv-input" style="font-family: Arial, sans-serif;" >
     </div>
     <div class="date-filter">
       <span>To:</span>
-      <input type="datetime-local" id="toDate" class="inv-input">
+      <input type="datetime-local" id="toDate" class="inv-input" style="font-family: Arial, sans-serif;">
     </div>
 
     <button id="viewBtn" class="inv-button">View</button>
@@ -88,79 +88,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const popupTableBody = document.querySelector("#popupTable tbody");
   const closePopup = document.getElementById("closePopup");
 
+  let isRestoringSession = true;
+
   /* ======================================================
-      ✔ DISABLE FUTURE DATES + AUTO SELECT CUSTOM
+      DISABLE FUTURE DATES
   ====================================================== */
   const now = new Date().toISOString().slice(0, 16);
   fromDate.max = now;
   toDate.max = now;
 
-  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
-  toDate.addEventListener("click", () => hourSelect.value = "Custom");
-
-  hourSelect.addEventListener("change", () => {
-    if (hourSelect.value !== "Custom") {
-      fromDate.value = "";
-      toDate.value = "";
-    }
-  });
-
   /* ======================================================
-      UNIVERSAL SORTING (supports Silo-XX numeric sorting)
-  ====================================================== */
-  let sortState = {};
-
-  function enableSorting(tableHead, tableBody) {
-    const headers = tableHead.querySelectorAll("th");
-
-    headers.forEach((th, colIndex) => {
-      th.style.cursor = "pointer";
-      th.addEventListener("click", () => sortTable(tableBody, colIndex));
-    });
-  }
-
-  function sortTable(body, colIndex) {
-    let rows = Array.from(body.querySelectorAll("tr"));
-    sortState[colIndex] = sortState[colIndex] === "asc" ? "desc" : "asc";
-
-    rows.sort((a, b) => {
-
-      let A = a.children[colIndex].innerText.trim();
-      let B = b.children[colIndex].innerText.trim();
-
-      /* 🔥 Special Case: Silo-X sorting */
-      const siloPattern = /^silo[-\s]?(\d+)$/i;
-
-      const aMatch = A.match(siloPattern);
-      const bMatch = B.match(siloPattern);
-
-      if (aMatch && bMatch) {
-        const numA = parseInt(aMatch[1]);
-        const numB = parseInt(bMatch[1]);
-
-        return sortState[colIndex] === "asc" ? numA - numB : numB - numA;
-      }
-
-      /* Normal numeric sorting fallback */
-      const numA = parseFloat(A);
-      const numB = parseFloat(B);
-
-      if (!isNaN(numA) && !isNaN(numB)) {
-        return sortState[colIndex] === "asc" ? numA - numB : numB - numA;
-      }
-
-      /* String sorting */
-      return sortState[colIndex] === "asc"
-        ? A.localeCompare(B)
-        : B.localeCompare(A);
-    });
-
-    body.innerHTML = "";
-    rows.forEach(row => body.appendChild(row));
-  }
-
-  /* ======================================================
-      RESTORE SESSION STORAGE
+      SESSION RESTORE (🔥 FIRST)
   ====================================================== */
   function restoreSession() {
     const filters = JSON.parse(sessionStorage.getItem("analytics_filters"));
@@ -169,16 +107,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (filters) {
       hourSelect.value = filters.hours;
-      fromDate.value = filters.from_time;
-      toDate.value = filters.to_time;
+      fromDate.value = filters.from_time || "";
+      toDate.value = filters.to_time || "";
     }
 
-    if (tableData) {
+    if (tableData && tableData.length) {
       renderTable(tableData);
-      totalLabel.textContent = "Total Batch Weight (in Tons): " + savedTotal;
+      totalLabel.textContent = `Total Batch Weight (in Tons): ${savedTotal}`;
     }
+
+    isRestoringSession = false;
   }
   restoreSession();
+
+  /* ======================================================
+      USER INTERACTION LOGIC
+  ====================================================== */
+  fromDate.addEventListener("click", () => {
+    hourSelect.value = "Custom";
+  });
+
+  toDate.addEventListener("click", () => {
+    hourSelect.value = "Custom";
+  });
+
+  hourSelect.addEventListener("change", () => {
+    if (isRestoringSession) return;
+    if (hourSelect.value !== "Custom") {
+      fromDate.value = "";
+      toDate.value = "";
+    }
+  });
 
   /* ======================================================
       VIEW BUTTON
@@ -208,8 +167,10 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTable(result.data);
     totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
 
-    // SAVE SESSION
-    sessionStorage.setItem("analytics_filters", JSON.stringify({ hours, from_time, to_time }));
+    sessionStorage.setItem(
+      "analytics_filters",
+      JSON.stringify({ hours, from_time, to_time })
+    );
     sessionStorage.setItem("analytics_table", JSON.stringify(result.data));
     sessionStorage.setItem("analytics_total", result.total_weight);
   });
@@ -231,9 +192,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
 
+    const safeFrom = from_time.replace(/[:T]/g, "-");
+    const safeTo = to_time.replace(/[:T]/g, "-");
+
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Analytics_${hours.replace(" ", "_")}.xlsx`;
+    a.download = `SKEW_Analytics_${safeFrom}_to_${safeTo}.xlsx`;
     a.click();
 
     URL.revokeObjectURL(url);
@@ -243,25 +207,15 @@ document.addEventListener("DOMContentLoaded", () => {
       ANALYTICS DASH
   ====================================================== */
   analyticsBtn.addEventListener("click", async () => {
-    try {
-      const res = await fetch("/api/analytics/dash");
-      const result = await res.json();
-
-      if (result.success) {
-        window.open(result.url, "_blank");
-      } else {
-        alert("Failed to open analytics dashboard.");
-      }
-    } catch (err) {
-      alert("Error launching dashboard.");
-    }
+    const res = await fetch("/api/analytics/dash");
+    const result = await res.json();
+    if (result.success) window.open(result.url, "_blank");
   });
 
   /* ======================================================
-      RENDER MAIN TABLE
+      TABLE RENDER
   ====================================================== */
   function renderTable(data) {
-
     const cols = [
       { key: "Category", label: "Category" },
       { key: "SetWeight", label: "Set Weight (Kg)" },
@@ -270,9 +224,8 @@ document.addEventListener("DOMContentLoaded", () => {
       { key: "Error_%", label: "Error (%)" }
     ];
 
-    tableHead.innerHTML = `
-      <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
-    `;
+    tableHead.innerHTML =
+      `<tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>`;
 
     tableBody.innerHTML = "";
 
@@ -282,88 +235,21 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.addEventListener("click", () => openPopup(row.Category));
       tableBody.appendChild(tr);
     });
-
-    // 🔥 Enable sorting after table is rendered
-    setTimeout(() => enableSorting(tableHead, tableBody), 50);
   }
 
   /* ======================================================
-      POPUP WINDOW
+      POPUP
   ====================================================== */
   async function openPopup(category) {
     popup.style.display = "flex";
     popupTitle.textContent = `PLC Data for: ${category}`;
-
     popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
     popupTableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
-
-    const hours = hourSelect.value;
-    const from_time = fromDate.value;
-    const to_time = toDate.value;
-
-    const res = await fetch("/api/plc_data_analytics", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category, hours, from_time, to_time })
-    });
-
-    const result = await res.json();
-    const data = result.data;
-
-    if (!data || data.length === 0) {
-      popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
-      popupTableBody.innerHTML = `<tr><td>No PLC Data Available</td></tr>`;
-      return;
-    }
-
-    const allCols = [
-      { key: "Category", label: "Category" },
-      { key: "SetWeight", label: "Set Weight (Kg)" },
-      { key: "ActualWeight", label: "Actual Weight (Kg)" },
-      { key: "FineWeight", label: "Fine Weight (Kg)" },
-      { key: "Error_Kg", label: "Error (Kg)" },
-      { key: "Error_%", label: "Error (%)" },
-      { key: "DiffPerc", label: "Difference (%)" },
-      { key: "DiffKg", label: "Difference (Kg)" },
-      { key: "TimeStamp", label: "Timestamp" }
-    ];
-
-    const cols = allCols.filter(col => col.key in data[0]);
-
-    popupTableHead.innerHTML =
-      `<tr>${cols.map(col => `<th>${col.label}</th>`).join("")}</tr>`;
-
-    popupTableBody.innerHTML =
-      data.map(row =>
-        `<tr>${cols.map(col => `<td>${row[col.key] ?? ""}</td>`).join("")}</tr>`
-      ).join("");
-
   }
 
-  document.getElementById("downloadPopupExcel").addEventListener("click", async () => {
-    const category = popupTitle.textContent.replace("PLC Data for: ", "");
-    const hours = hourSelect.value;
-    const from_time = fromDate.value;
-    const to_time = toDate.value;
-
-    const res = await fetch("/api/plc_data_analytics_excel", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category, hours, from_time, to_time })
-    });
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `PLC_Data_${category}.xlsx`;
-    a.click();
-
-    URL.revokeObjectURL(url);
+  closePopup.addEventListener("click", () => {
+    popup.style.display = "none";
   });
-
-  closePopup.addEventListener("click", () => popup.style.display = "none");
 });
 </script>
 

@@ -19,12 +19,12 @@
 
     <div class="date-filter">
       <span>From:</span>
-      <input type="datetime-local" id="fromDate" class="inv-input">
+      <input type="datetime-local" id="fromDate" class="inv-input" style="font-family: Arial, sans-serif;">
     </div>
 
     <div class="date-filter">
       <span>To:</span>
-      <input type="datetime-local" id="toDate" class="inv-input">
+      <input type="datetime-local" id="toDate" class="inv-input" style="font-family: Arial, sans-serif;">
     </div>
 
     <button id="viewBtn" class="inv-button">View</button>
@@ -235,13 +235,20 @@ exportBtn.addEventListener("click", async () => {
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
 
+  // Make filename safe (replace ":" with "-")
+  const safeFrom = from_time.replace(/[:T]/g, "-");
+  const safeTo = to_time.replace(/[:T]/g, "-");
+
+  const filename = `SKEW_Batchs_Report_${safeFrom}_to_${safeTo}.xlsx`;
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = "Report.xlsx";
+  a.download = filename;
   a.click();
 
   URL.revokeObjectURL(url);
 });
+
 
 
 

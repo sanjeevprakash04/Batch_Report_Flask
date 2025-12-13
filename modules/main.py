@@ -61,6 +61,10 @@ def data_process(hours, from_time, to_time):
             df["BatchNo"] = df["BatchNo"].astype(int)
             # Sort by column 'Score' in descending order
             df_sorted = df.sort_values(by='BatchNo', ascending=False)
+            df_sorted = df_sorted.rename(
+                columns={"Total Batch Weight": "Total Batch Weight(Kg)"}
+            )
+
 
             total_weight_tons = round(float(df["Total Batch Weight"].astype(float).sum() / 1000), 2)
 
@@ -245,29 +249,28 @@ def dashboard_calculations(start_timestamp, end_timestamp):
                 "calendar_chart": []
             }
 
-        # normalize timestamps
+        # ------------------ LINE CHART LOGIC (MULTI PLANT) ------------------
         df_batches["TimeStamp"] = pd.to_datetime(df_batches["TimeStamp"], errors="coerce")
-        df_batches = df_batches.dropna(subset=["TimeStamp"])
 
-        # ------------------ LINE CHART LOGIC ------------------
         if time_diff_hours < 24:
-            df_batches["Hour"] = df_batches["TimeStamp"].dt.floor("H")
-            grouped = (
-                df_batches.groupby("Hour")["BatchNo"]
-                .nunique()
-                .reset_index(name="BatchCount")
-                .sort_values("Hour")
-            )
-            grouped["Hour"] = grouped["Hour"].dt.strftime("%H:00")
+            df_batches["TimeKey"] = df_batches["TimeStamp"].dt.floor("H")
+            time_fmt = "%H:00"
         else:
-            df_batches["Hour"] = df_batches["TimeStamp"].dt.date
-            grouped = (
-                df_batches.groupby("Hour")["BatchNo"]
-                .nunique()
-                .reset_index(name="BatchCount")
-                .sort_values("Hour")
-            )
-            grouped["Hour"] = grouped["Hour"].astype(str)
+            df_batches["TimeKey"] = df_batches["TimeStamp"].dt.date
+            time_fmt = "%Y-%m-%d"
+
+        grouped = (
+            df_batches
+            .groupby(["TimeKey", "Plant Name"])["BatchNo"]
+            .nunique()
+            .reset_index(name="BatchCount")
+            .sort_values("TimeKey")
+        )
+
+        grouped["TimeKey"] = grouped["TimeKey"].astype(str)
+
+        line_chart = grouped.to_dict(orient="records")
+
 
         print("Grouped counts (preview):")
         print(grouped.head(10))

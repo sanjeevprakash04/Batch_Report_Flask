@@ -28,12 +28,12 @@
 
         <div class="date-filter">
             <span>From:</span>
-            <input type="datetime-local" id="fromDate" class="inv-input">
+            <input type="datetime-local" id="fromDate" class="inv-input" style="font-family: Arial, sans-serif;">
         </div>
 
         <div class="date-filter">
             <span>To:</span>
-            <input type="datetime-local" id="toDate" class="inv-input">
+            <input type="datetime-local" id="toDate" class="inv-input" style="font-family: Arial, sans-serif;">
         </div>
 
         <!-- Download Button -->
@@ -44,7 +44,7 @@
 
 
 <!-- WRAPPER FOR PDF SCREENSHOT -->
-<div id="dashboardContainer">
+<div id="dashboardContainer" class="dashboard-content">
 
     <!-- GRID -->
     <div class="dashboard-grid">
@@ -139,7 +139,7 @@ function loadFilters() {
     let hours = localStorage.getItem("dash_hours");
 
     if (!from || !to) {
-        from = "2020-03-01T00:00";
+        from = "2025-03-01T00:00";
         to = "2025-04-30T23:59";
         saveFilters(from, to, "Custom");
     }
@@ -147,7 +147,7 @@ function loadFilters() {
     fromDate.value = from;
     toDate.value = to;
     hourSelect.value = hours || "Custom";
-    fetchDashboard(from, to);
+    fetchDashboard(from, to, hours);
 }
 
 /* =========================
@@ -164,11 +164,24 @@ toDate.addEventListener("change", () => {
 });
 
 hourSelect.addEventListener("change", () => {
+
+    // Hour-based filter selected
     if (hourSelect.value !== "Custom") {
+
+        // Clear manual dates
         fromDate.value = "";
         toDate.value = "";
+
+        // Save filter
+        saveFilters("", "", hourSelect.value);
+
+        // Fetch dashboard using hours
+        fetchDashboard(null, null, hourSelect.value);
     }
 });
+
+
+
 
 /* =========================
         APPLY FILTER
@@ -176,7 +189,7 @@ hourSelect.addEventListener("change", () => {
 function applyManual() {
     if (fromDate.value && toDate.value) {
         saveFilters(fromDate.value, toDate.value, "Custom");
-        fetchDashboard(fromDate.value, toDate.value);
+        fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
     }
 }
 
@@ -187,39 +200,120 @@ document.getElementById("dwnBtn").addEventListener("click", function () {
 
     const dashboard = document.getElementById("dashboardContainer");
 
-    html2canvas(dashboard, { scale: 2 }).then(canvas => {
+    const fromInput = document.getElementById("fromDate").value;
+    const toInput = document.getElementById("toDate").value;
 
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jspdf.jsPDF("p", "mm", "a4");
+    const fromVal = fromInput ? fromInput.replace("T", " ") : "N/A";
+    const toVal = toInput ? toInput.replace("T", " ") : "N/A";
+    const printedOn = new Date().toLocaleString();
 
-        const pdfWidth = 210;
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    // Filename format
+    function formatForFile(dt) {
+        return dt.replace("T", "_").replace(":", "-");
+    }
 
-        /* -----------------------------
-           ADD TITLE
-        ----------------------------- */
-        pdf.setFontSize(18);
-        pdf.text("Production Dashboard Report", pdfWidth / 2, 15, { align: "center" });
+    const fromFile = fromInput ? formatForFile(fromInput) : "NA";
+    const toFile = toInput ? formatForFile(toInput) : "NA";
 
-        // Add screenshot image below the title
-        pdf.addImage(imgData, "PNG", 0, 25, pdfWidth, pdfHeight);
+    const fileName = `SKEW_Dashboard_${fromFile}_to_${toFile}.pdf`;
 
-        pdf.save("dashboard.pdf");
-    });
+    // Load logo
+    const logo = new Image();
+    logo.src = "{{ url_for('static', filename='images/skew-logo-horizontal.png') }}";
+
+    logo.onload = function () {
+
+        html2canvas(dashboard, {
+            scale: 2,
+            useCORS: true
+        }).then(canvas => {
+
+            const pdf = new jspdf.jsPDF("p", "mm", "a4");
+
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+
+            const headerHeight = 42;
+            const marginBottom = 12;
+
+            const availableHeight = pdfHeight - headerHeight - marginBottom;
+
+            // Original image size
+            const imgWidth = pdfWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            // 🔥 SCALE TO FIT ONE PAGE
+            const scaleRatio = Math.min(1, availableHeight / imgHeight);
+            const finalImgHeight = imgHeight * scaleRatio;
+            const finalImgWidth = imgWidth * scaleRatio;
+
+            /* =========================
+                 HEADER
+            ========================= */
+            pdf.addImage(logo, "PNG", 10, 8, 27, 7);
+
+            pdf.setFontSize(18);
+            pdf.text("Production Dashboard Report", pdfWidth / 2, 15, {
+                align: "center"
+            });
+
+            pdf.setFontSize(10);
+            pdf.text(`From : ${fromVal}`, 14, 28);
+            pdf.text(`To      : ${toVal}`, 14, 34);
+
+            pdf.text(`Printed On : ${printedOn}`, pdfWidth - 14, 28, {
+                align: "right"
+            });
+
+            pdf.setDrawColor(200);
+            pdf.line(10, 38, pdfWidth - 10, 38);
+
+            /* =========================
+                 DASHBOARD IMAGE (ONE PAGE)
+            ========================= */
+            pdf.addImage(
+                canvas,
+                "PNG",
+                (pdfWidth - finalImgWidth) / 2,  // center horizontally
+                headerHeight,
+                finalImgWidth,
+                finalImgHeight
+            );
+
+            pdf.save(fileName);
+        });
+    };
 });
-
-
 
 /* =========================
     FETCH DASHBOARD DATA
 ========================= */
-function fetchDashboard(from, to) {
-    let start = from.replace("T", " ") + ":00";
-    let end = to.replace("T", " ") + ":00";
+function fetchDashboard(from, to, hours) {
 
-    fetch(`/api/dashboard?start_time=${start}&end_time=${end}`)
+    let params = new URLSearchParams();
+
+    // Custom date range
+    if (hours === "Custom") {
+        const start = from.replace("T", " ") + ":00";
+        const end = to.replace("T", " ") + ":00";
+
+        params.append("start_time", start);
+        params.append("end_time", end);
+    }
+    // Hour-based filter
+    else {
+        params.append("hours", hours); // e.g. "1 Hr", "4 Hr"
+    }
+
+    fetch(`/api/dashboard?${params.toString()}`)
         .then(res => res.json())
         .then(api => {
+            if (api.status === "error") {
+
+                showNoData(api.message || "No data available");
+                clearDashboard();
+                return;
+            }
 
             if (api.status === "success") {
 
@@ -235,6 +329,9 @@ function fetchDashboard(from, to) {
                 });
 
             }
+        })
+        .catch(err => {
+            console.error("Dashboard fetch error:", err);
         });
 }
 
@@ -262,58 +359,77 @@ function drawLineChart(data) {
         return;
     }
 
+    // 🔹 Extract unique TimeKeys and Plant Names
+    const times = [...new Set(data.map(d => d.TimeKey))];
+    const plants = [...new Set(data.map(d => d["Plant Name"]))];
+
     let table = new google.visualization.DataTable();
     table.addColumn('date', 'Time');
-    table.addColumn('number', 'Batch Weight (Kg)');
 
-    data.forEach(r => {
-        let dt = new Date(r.Hour);
-        table.addRow([dt, r.BatchCount]);
+    // 🔹 One column per Plant → legend auto generated
+    plants.forEach(p => table.addColumn('number', p));
+
+    // 🔹 Detect Hourly or Daily
+    const isHourly = times[0].includes(":");
+
+    times.forEach(t => {
+
+        let dateObj;
+
+        if (isHourly) {
+            // Hourly → today + HH:00
+            const [hh] = t.split(":");
+            dateObj = new Date();
+            dateObj.setHours(parseInt(hh), 0, 0, 0);
+        } else {
+            // Daily → yyyy-mm-dd
+            dateObj = new Date(t);
+        }
+
+        let row = [dateObj];
+
+        plants.forEach(p => {
+            const rec = data.find(
+                d => d.TimeKey === t && d["Plant Name"] === p
+            );
+            row.push(rec ? rec.BatchCount : 0);
+        });
+
+        table.addRow(row);
     });
 
-    let firstLabel = String(data[0].Hour);
-    let isHourly = firstLabel.includes(":");
-    let xTitle = isHourly ? "Time" : "Date";
-
-    let formatter = new google.visualization.DateFormat({
-        pattern: isHourly ? "HH:mm" : "MMM d yyyy"
-    });
-    formatter.format(table, 0);
-
-    let interval = Math.max(1, Math.ceil(data.length / 10));
-
-    let chart = new google.visualization.LineChart(document.getElementById('lineChart'));
+    let chart = new google.visualization.LineChart(
+        document.getElementById('lineChart')
+    );
 
     chart.draw(table, {
-        curveType: 'function',
-        pointSize: 5,
-        dataOpacity: 0.9,
         height: 330,
+        curveType: 'function',
+        pointSize: 4,
+        dataOpacity: 0.9,
 
         legend: { position: 'top' },
 
         hAxis: {
-            title: xTitle,
+            title: isHourly ? "Time" : "Date",
             slantedText: true,
             slantedTextAngle: 45,
-            textStyle: { fontSize: 10 },
-            showTextEvery: interval,
-            gridlines: { count: -1 }
+            textStyle: { fontSize: 10 }
         },
 
         vAxis: {
             title: "Batch Weight (Kg)",
             viewWindow: { min: 0 },
-            textStyle: { fontSize: 12 }
+            titleTextStyle: {
+                italic: false,
+                fontSize: 15,
+                color: "#000"
+            }
         },
 
-        tooltip: {
-            trigger: 'both',
-            isHtml: true
-        }
+        tooltip: { trigger: 'both' }
     });
 }
-
 
 /* =========================
          DONUT CHART

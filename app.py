@@ -68,30 +68,58 @@ def dashboard():
 
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
-
     try:
         start_time = request.args.get("start_time")
         end_time = request.args.get("end_time")
+        hours = request.args.get("hours")
+        print(f"📥 Dashboard Filters → Hours: {hours}, Start: {start_time}, End: {end_time}")
 
+        # ❌ Hour-based filter not supported
+        if hours and hours != "Custom":
+            return jsonify({
+                "status": "error",
+                "message": "No data available for hour-based filter"
+            }), 200   # 200 so frontend can show message cleanly
+
+        # ❌ Missing required parameters
         if not start_time or not end_time:
             return jsonify({
                 "status": "error",
                 "message": "start_time and end_time are required"
             }), 400
 
+        # ✅ Parse datetime
         s_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
         e_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
-        # FIX → NO NESTED JSON
+        # ✅ Fetch dashboard data
         data = main.dashboard_calculations(s_time, e_time)
 
-        return jsonify(data)
+        # ❌ No data found
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No data found for selected date range"
+            }), 200
+
+        # ✅ Success response
+        return jsonify({
+            "status": "success",
+            **data
+        }), 200
+
+    except ValueError:
+        return jsonify({
+            "status": "error",
+            "message": "Invalid datetime format"
+        }), 400
 
     except Exception as e:
         return jsonify({
             "status": "error",
             "message": str(e)
         }), 500
+
 
 
 @app.route('/logs')
