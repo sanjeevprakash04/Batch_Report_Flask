@@ -201,7 +201,7 @@ def dashboard_calculations(start_timestamp, end_timestamp, hours):
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
         engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
 
-        if not hours or hours != "Custom":
+        if hours != "Custom":
             print("No batch data found in range")
             return {
                 "status": "success",
@@ -211,6 +211,7 @@ def dashboard_calculations(start_timestamp, end_timestamp, hours):
                 "raw_material_chart": [],
                 "calendar_chart": []
             }
+        
 
         # Ensure datetimes
         start_dt = pd.to_datetime(start_timestamp)

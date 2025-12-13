@@ -75,16 +75,13 @@ def get_dashboard():
         print(f"📥 Dashboard Filters → Hours: {hours}, Start: {start_time}, End: {end_time}")
 
         
-        # ❌ Missing required parameters
-        if not start_time or not end_time:
-            return jsonify({
-                "status": "error",
-                "message": "start_time and end_time are required"
-            }), 400
-
-        # ✅ Parse datetime
-        s_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
-        e_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+        if hours and hours != "Custom":
+            print("⚠ No valid start/end time provided, using hour-based filter")
+            s_time = None
+            e_time = None
+        else:
+            s_time = datetime.fromisoformat(start_time)
+            e_time = datetime.fromisoformat(end_time)
 
         # ✅ Fetch dashboard data
         data = main.dashboard_calculations(s_time, e_time, hours)
