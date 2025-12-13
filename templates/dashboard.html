@@ -169,6 +169,10 @@ toDate.addEventListener("change", () => {
 });
 
 hourSelect.addEventListener("change", () => {
+    if (hourSelect.value !== "Custom") {
+        fromDate.value = "";
+        toDate.value = "";
+    }
     
     applyManual();
 });
@@ -184,8 +188,7 @@ function applyManual() {
         saveFilters(fromDate.value, toDate.value, "Custom");
         fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
     }else{
-        fromDate.value = "";
-        toDate.value = "";
+        
         saveFilters(fromDate.value, toDate.value, hourSelect.value);
         fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
     }
