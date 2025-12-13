@@ -74,13 +74,7 @@ def get_dashboard():
         hours = request.args.get("hours")
         print(f"📥 Dashboard Filters → Hours: {hours}, Start: {start_time}, End: {end_time}")
 
-        # ❌ Hour-based filter not supported
-        if hours and hours != "Custom":
-            return jsonify({
-                "status": "error",
-                "message": "No data available for hour-based filter"
-            }), 200   # 200 so frontend can show message cleanly
-
+        
         # ❌ Missing required parameters
         if not start_time or not end_time:
             return jsonify({
@@ -93,7 +87,7 @@ def get_dashboard():
         e_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
 
         # ✅ Fetch dashboard data
-        data = main.dashboard_calculations(s_time, e_time)
+        data = main.dashboard_calculations(s_time, e_time, hours)
 
         # ❌ No data found
         if not data:
@@ -1506,4 +1500,4 @@ def inject_user():
 
 if __name__ == '__main__':
     # Timer(1, open_browser).start()
-    app.run(debug=True)
+    app.run()

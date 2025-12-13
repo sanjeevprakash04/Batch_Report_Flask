@@ -111,8 +111,13 @@
         <!-- Calendar Chart -->
         <div class="grid-item">
             <div class="chart-box">
-                <h3 class="chart-title">Production Calendar</h3>
-                <div id="calendarChart" style="height: 350px;"></div>
+                <div style="display: flex; justify-content: space-between; margin-right: 0.5rem;">
+                    <h3 class="chart-title">Production Calendar</h3>
+                    <select id="yearSelect" class="year-select">
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+                <div id="calendarChart" class="calendar-chart"></div>
             </div>
         </div>
 
@@ -164,20 +169,8 @@ toDate.addEventListener("change", () => {
 });
 
 hourSelect.addEventListener("change", () => {
-
-    // Hour-based filter selected
-    if (hourSelect.value !== "Custom") {
-
-        // Clear manual dates
-        fromDate.value = "";
-        toDate.value = "";
-
-        // Save filter
-        saveFilters("", "", hourSelect.value);
-
-        // Fetch dashboard using hours
-        fetchDashboard(null, null, hourSelect.value);
-    }
+    
+    applyManual();
 });
 
 
@@ -189,6 +182,11 @@ hourSelect.addEventListener("change", () => {
 function applyManual() {
     if (fromDate.value && toDate.value) {
         saveFilters(fromDate.value, toDate.value, "Custom");
+        fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
+    }else{
+        fromDate.value = "";
+        toDate.value = "";
+        saveFilters(fromDate.value, toDate.value, hourSelect.value);
         fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
     }
 }
@@ -297,11 +295,19 @@ function fetchDashboard(from, to, hours) {
         const start = from.replace("T", " ") + ":00";
         const end = to.replace("T", " ") + ":00";
 
+
         params.append("start_time", start);
         params.append("end_time", end);
+        params.append("hours", hours); 
+
     }
     // Hour-based filter
     else {
+        const start = from.replace("T", " ") + ":00";
+        const end = to.replace("T", " ") + ":00";
+
+        params.append("start_time", start);
+        params.append("end_time", end);
         params.append("hours", hours); // e.g. "1 Hr", "4 Hr"
     }
 
@@ -411,10 +417,10 @@ function drawLineChart(data) {
         legend: { position: 'top' },
 
         hAxis: {
-            title: isHourly ? "Time" : "Date",
             slantedText: true,
             slantedTextAngle: 45,
-            textStyle: { fontSize: 10 }
+            textStyle: { fontSize: 15 }
+            
         },
 
         vAxis: {
@@ -422,12 +428,17 @@ function drawLineChart(data) {
             viewWindow: { min: 0 },
             titleTextStyle: {
                 italic: false,
-                fontSize: 15,
+                fontSize: 20,
                 color: "#000"
             }
         },
 
-        tooltip: { trigger: 'both' }
+        tooltip: { trigger: 'both' },
+
+        chartArea: {
+            width: '80%',
+            height: '55%'
+        },
     });
 }
 
@@ -457,7 +468,13 @@ function drawRecipeChart(data) {
         height: 280,
         margin: 0,
         pieSliceText: "none",
-        legend: { position: 'right', alignment: 'center' }
+        legend: { position: 'right', alignment: 'center', textStyle: { fontSize: 16 } },
+        chartArea: {
+            left: 0,
+            width: '70%',
+            height: '80%'
+        }
+
     });
 }
 
@@ -488,16 +505,20 @@ function drawCalendarChart(data) {
     let chart = new google.visualization.Calendar(document.getElementById('calendarChart'));
 
     chart.draw(table, {
-        height: 350,
+        height: 220,
+        chartArea: {
+            width: '100%',
+            height: '100%'
+        },
         calendar: {
-            cellSize: 18,
-            yearLabel: { fontSize: 16, color: "#444" },
+            cellSize: 20,
+            cellPadding: 3,
             dayOfWeekLabel: { fontSize: 12 },
             monthLabel: { fontSize: 14 }
-        }
+        },
+
     });
 }
-
 
 /* =========================
           BAR CHART
@@ -520,7 +541,11 @@ function drawSiloChart(data) {
     let chart = new google.visualization.ColumnChart(document.getElementById('siloChart'));
     chart.draw(table, {
         height: 330,
-        legend: { position: 'top' }
+        legend: { position: 'top' },
+        chartArea: {
+            width: '90%',
+            height: '60%'
+        },
     });
 }
 

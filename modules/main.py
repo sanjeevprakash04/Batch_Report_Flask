@@ -195,11 +195,22 @@ def report_data_process(batch_no):
         return {"success": False, "error": str(e)}
 
 
-def dashboard_calculations(start_timestamp, end_timestamp):
+def dashboard_calculations(start_timestamp, end_timestamp, hours):
     try:
         print("Dashboard calculations called")
         conn, cursorRead, cursorWrite = sqliteCon.get_db_connection()
         engine, engineConRead, engineConWrite = sqliteCon.get_db_connection_engine()
+
+        if not hours or hours != "Custom":
+            print("No batch data found in range")
+            return {
+                "status": "success",
+                "summary": {},
+                "line_chart": [],
+                "recipe_chart": [],
+                "raw_material_chart": [],
+                "calendar_chart": []
+            }
 
         # Ensure datetimes
         start_dt = pd.to_datetime(start_timestamp)
@@ -356,6 +367,10 @@ def dashboard_calculations(start_timestamp, end_timestamp):
     except Exception as e:
         print("Error:", e)
         return {"status": "error", "message": str(e)}
+
+
+
+
 
 
 
