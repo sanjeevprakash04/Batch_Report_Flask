@@ -184,11 +184,11 @@ hourSelect.addEventListener("change", () => {
         APPLY FILTER
 ========================= */
 function applyManual() {
-    if (fromDate.value && toDate.value) {
+    if (hourSelect.value === "Custom") {
         saveFilters(fromDate.value, toDate.value, "Custom");
         fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
     }else{
-        
+
         saveFilters(fromDate.value, toDate.value, hourSelect.value);
         fetchDashboard(fromDate.value, toDate.value, hourSelect.value);
     }
