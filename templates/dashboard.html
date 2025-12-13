@@ -85,18 +85,12 @@
         <!-- Donut Chart -->
         <div class="grid-item">
             <div class="chart-box-recipe">
-                <h3 class="chart-title">Recipe</h3>
+                <h3 class="chart-title">Production by Recipe</h3>
                 <div id="recipeChart"></div>
             </div>
         </div>
 
-        <!-- Calendar Chart -->
-        <div class="grid-item">
-            <div class="chart-box">
-                <h3 class="chart-title">Production Calendar</h3>
-                <div id="calendarChart" style="height: 350px;"></div>
-            </div>
-        </div>
+        
 
         <!-- Line Chart -->
         <div class="grid-item">
@@ -111,6 +105,14 @@
             <div class="chart-box">
                 <h3 class="chart-title">Raw Material Consumption</h3>
                 <div id="siloChart"></div>
+            </div>
+        </div>
+
+        <!-- Calendar Chart -->
+        <div class="grid-item">
+            <div class="chart-box">
+                <h3 class="chart-title">Production Calendar</h3>
+                <div id="calendarChart" style="height: 350px;"></div>
             </div>
         </div>
 
@@ -193,10 +195,19 @@ document.getElementById("dwnBtn").addEventListener("click", function () {
         const pdfWidth = 210;
         const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+        /* -----------------------------
+           ADD TITLE
+        ----------------------------- */
+        pdf.setFontSize(18);
+        pdf.text("Production Dashboard Report", pdfWidth / 2, 15, { align: "center" });
+
+        // Add screenshot image below the title
+        pdf.addImage(imgData, "PNG", 0, 25, pdfWidth, pdfHeight);
+
         pdf.save("dashboard.pdf");
     });
 });
+
 
 
 /* =========================
@@ -327,7 +338,8 @@ function drawRecipeChart(data) {
     let chart = new google.visualization.PieChart(document.getElementById('recipeChart'));
     chart.draw(table, {
         pieHole: 0.80,
-        height: 330,
+        height: 280,
+        margin: 0,
         pieSliceText: "none",
         legend: { position: 'right', alignment: 'center' }
     });
