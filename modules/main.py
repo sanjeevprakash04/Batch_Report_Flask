@@ -246,6 +246,40 @@ def dashboard_calculations(start_timestamp, end_timestamp, hours):
         """
         df_batches = pd.read_sql_query(query_batches, engineConRead)
 
+        df_ttl_tons = sqliteCon.show_data(conn, hours, str(start_dt), str(end_dt), engineConRead)
+
+        if df_ttl_tons is None or df_ttl_tons.empty:
+            return {
+                "status": "success",
+                "summary": {},
+                "line_chart": [],
+                "recipe_chart": [],
+                "raw_material_chart": [],
+                "calendar_chart": []
+            }
+        # Use your existing processing function
+        df_diff = sqliteCon.process_batch_data(df_ttl_tons)
+        if df_diff is None or df_diff.empty:
+            return {
+                "status": "success",
+                "summary": {},
+                "line_chart": [],
+                "recipe_chart": [],
+                "raw_material_chart": [],
+                "calendar_chart": []
+            }
+        
+
+        # Keep only the columns your frontend expects (if present)
+        column_order = ["Category", "SetWeight", "ActualWeight", "Error_%", "Error_Kg"]
+        existing_columns = [c for c in column_order if c in df_diff.columns]
+        df_diff = df_diff[existing_columns]
+
+        # Calculate total (sum Error_Kg -> convert to tons by dividing 1000)
+        total_error_kg = df_diff["Error_Kg"].sum() if "Error_Kg" in df_diff.columns else 0
+        total_tons = round(total_error_kg / 1000.0, 2)
+
+
         # Full table for calendar chart
         query_calander = "SELECT * FROM Batches"
         df_calander = pd.read_sql_query(query_calander, engineConRead)
@@ -357,7 +391,8 @@ def dashboard_calculations(start_timestamp, end_timestamp, hours):
                 "num_batches": number_of_batches,
                 "tph": tph,
                 "batch_accuracy": batch_accuracy,
-                "avg_cycle_time": avg_cycle_time
+                "avg_cycle_time": avg_cycle_time,
+                "total_loss": total_tons
             },
             "line_chart": grouped.to_dict(orient="records"),
             "recipe_chart": recipe_counts.to_dict(orient="records"),
@@ -376,3 +411,10 @@ def dashboard_calculations(start_timestamp, end_timestamp, hours):
 
 
 
+
+        
+
+        
+
+        
+        

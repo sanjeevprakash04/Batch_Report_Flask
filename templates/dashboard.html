@@ -74,10 +74,18 @@
                     <p class="value" id="batch_acc">0%</p>
                 </div>
 
+                
+
                 <div class="card">
                     <h3>Avg Batch Cycle Time</h3>
                     <p class="value" id="cycle_time">0</p>
                     <span class="unit">min</span>
+                </div>
+
+                <div class="card">
+                    <h3>Total Loss</h3>
+                    <p class="value" id="total_loss">0</p>
+                    <span class="unit">tons</span>
                 </div>
             </div>
         </div>
@@ -143,15 +151,20 @@ function loadFilters() {
     let to = localStorage.getItem("dash_to");
     let hours = localStorage.getItem("dash_hours");
 
-    if (!from || !to) {
-        from = "2025-03-01T00:00";
-        to = "2025-04-30T23:59";
-        saveFilters(from, to, "Custom");
+    // ✅ FIRST LOAD DEFAULT (SAFE)
+    if (!from || !to || !hours) {
+        from = "2025-05-01T00:00";
+        to   = "2025-06-30T23:59";
+        hours = "Custom";
+
+        saveFilters(from, to, hours);
     }
 
     fromDate.value = from;
     toDate.value = to;
-    hourSelect.value = hours || "Custom";
+    hourSelect.value = hours;
+
+    // ✅ AUTO FETCH (WORKING)
     fetchDashboard(from, to, hours);
 }
 
@@ -353,6 +366,7 @@ function updateSummary(s) {
     tph.innerText = s.tph;
     batch_acc.innerText = s.batch_accuracy + "%";
     cycle_time.innerText = s.avg_cycle_time;
+    total_loss.innerText = s.total_loss;
 }
 
 
