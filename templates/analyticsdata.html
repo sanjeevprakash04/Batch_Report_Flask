@@ -4,9 +4,8 @@
 <!-- ===============================
       ANALYTICS HEADER
 =============================== -->
-<div style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;">
+<div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem;">
   <div class="inv-navbar-right">
-
     <select id="hourSelect" class="inv-select">
       <option value="1 Hr">1 Hr</option>
       <option value="4 Hr">4 Hr</option>
@@ -20,7 +19,6 @@
       <span>From:</span>
       <input type="datetime-local" id="fromDate" class="inv-input">
     </div>
-
     <div class="date-filter">
       <span>To:</span>
       <input type="datetime-local" id="toDate" class="inv-input">
@@ -29,38 +27,39 @@
     <button id="viewBtn" class="inv-button">View</button>
     <button id="exportBtn" class="inv-button">Export</button>
     <button id="analyticsBtn" class="inv-button">Analytics</button>
-
-    <span id="totalLabel" class="total-label">
-      Total Batch Weight (in Tons): --
-    </span>
+    <span id="totalLabel" class="total-label">Total Batch Weight (in Tons): --</span>
   </div>
 </div>
 
 <!-- ===============================
-      TABLE
+      ANALYTICS TABLE
 =============================== -->
 <div class="table-wrapper-analytics">
   <table class="inv-table" id="reportTable">
-    <thead><tr><th>Waiting...</th></tr></thead>
-    <tbody><tr><td>Waiting for data...</td></tr></tbody>
+    <thead>
+      <tr><th>Waiting...</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Waiting for data...</td></tr>
+    </tbody>
   </table>
 </div>
 
 <!-- ===============================
-      POPUP
+      POPUP MODAL
 =============================== -->
-<div id="popupModal" class="popup-overlay" style="display:none;">
+<div id="popupModal" class="popup-overlay" style="display: none;">
   <div class="popup-content">
-    <h3 id="popupTitle">PLC Data</h3>
-
+    <h3 id="popupTitle" style="margin-left: 0.3rem;">PLC Data</h3>
     <div class="popup-table-wrapper">
       <table class="inv-table" id="popupTable">
         <thead><tr><th>Loading...</th></tr></thead>
-        <tbody><tr><td>Loading...</td></tr></tbody>
+        <tbody><tr><td>Loading data...</td></tr></tbody>
       </table>
     </div>
 
     <div class="popup-footer">
+      <button id="downloadPopupExcel" class="inv-button success" {% if not user_logged_in or role == 'operator' %} disabled title="Access Denied" {% endif %}>Download Excel</button>
       <button id="closePopup" class="inv-button warning">Close</button>
     </div>
   </div>
@@ -70,13 +69,14 @@
       SCRIPT
 =============================== -->
 <script>
+
 document.addEventListener("DOMContentLoaded", () => {
 
   const hourSelect = document.getElementById("hourSelect");
-  const fromDate   = document.getElementById("fromDate");
-  const toDate     = document.getElementById("toDate");
-  const viewBtn    = document.getElementById("viewBtn");
-  const exportBtn  = document.getElementById("exportBtn");
+  const fromDate = document.getElementById("fromDate");
+  const toDate = document.getElementById("toDate");
+  const viewBtn = document.getElementById("viewBtn");
+  const exportBtn = document.getElementById("exportBtn");
   const analyticsBtn = document.getElementById("analyticsBtn");
   const totalLabel = document.getElementById("totalLabel");
 
@@ -89,206 +89,295 @@ document.addEventListener("DOMContentLoaded", () => {
   const popupTableBody = document.querySelector("#popupTable tbody");
   const closePopup = document.getElementById("closePopup");
 
-  let isRestoring = true;
-  let sortState = {};
-  let currentData = [];
-
-  /* ----------------------------------------------------
-     Disable future dates
-  ---------------------------------------------------- */
-  const now = new Date().toISOString().slice(0,16);
+  /* ======================================================
+      ✔ DISABLE FUTURE DATES + AUTO SELECT CUSTOM
+  ====================================================== */
+  const now = new Date().toISOString().slice(0, 16);
   fromDate.max = now;
-  toDate.max   = now;
+  toDate.max = now;
 
-  /* ----------------------------------------------------
-     Restore Session (UPDATED)
-  ---------------------------------------------------- */
-  async function restoreSession() {
-    const filters = JSON.parse(localStorage.getItem("analytics_filters"));
-    const table   = JSON.parse(localStorage.getItem("analytics_table"));
-    const total   = localStorage.getItem("analytics_total");
-
-    /* ========= CASE 1: EXISTING SESSION ========= */
-    if (filters && table && table.length) {
-      hourSelect.value = filters.hours;
-      fromDate.value = filters.from_time || "";
-      toDate.value   = filters.to_time || "";
-
-      currentData = table;
-      renderTable(table);
-      totalLabel.textContent = `Total Batch Weight (in Tons): ${total}`;
-
-      isRestoring = false;
-      return;
-    }
-
-    /* ========= CASE 2: FIRST LOAD → DEFAULT CUSTOM ========= */
-    const defaultFrom = "2025-05-01T00:00";
-    const defaultTo   = "2025-06-30T23:59";
-
-    hourSelect.value = "Custom";
-    fromDate.value = defaultFrom;
-    toDate.value   = defaultTo;
-
-    tableHead.innerHTML = "<tr><th>Loading...</th></tr>";
-    tableBody.innerHTML = "<tr><td>Loading...</td></tr>";
-
-    const res = await fetch("/api/analytics_data", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({
-        hours: "Custom",
-        from_time: defaultFrom,
-        to_time: defaultTo
-      })
-    });
-
-    const r = await res.json();
-    if (!r.success) return;
-
-    currentData = r.data;
-    renderTable(r.data);
-    totalLabel.textContent = `Total Batch Weight (in Tons): ${r.total_weight}`;
-
-    localStorage.setItem("analytics_filters", JSON.stringify({
-      hours:"Custom",
-      from_time: defaultFrom,
-      to_time: defaultTo
-    }));
-    localStorage.setItem("analytics_table", JSON.stringify(r.data));
-    localStorage.setItem("analytics_total", r.total_weight);
-
-    isRestoring = false;
-  }
-  restoreSession();
-
-  /* ----------------------------------------------------
-     User interaction
-  ---------------------------------------------------- */
-  fromDate.addEventListener("click", () => !isRestoring && (hourSelect.value="Custom"));
-  toDate.addEventListener("click", () => !isRestoring && (hourSelect.value="Custom"));
+  fromDate.addEventListener("click", () => hourSelect.value = "Custom");
+  toDate.addEventListener("click", () => hourSelect.value = "Custom");
 
   hourSelect.addEventListener("change", () => {
-    if (isRestoring) return;
     if (hourSelect.value !== "Custom") {
       fromDate.value = "";
       toDate.value = "";
     }
   });
 
-  /* ----------------------------------------------------
-     Render Table + Sorting
-  ---------------------------------------------------- */
-  function renderTable(data) {
-    const cols = [
-      {k:"Category",l:"Category"},
-      {k:"SetWeight",l:"Set Weight"},
-      {k:"ActualWeight",l:"Actual Weight"},
-      {k:"Error_Kg",l:"Error (Kg)"},
-      {k:"Error_%",l:"Error (%)"}
-    ];
+  /* ======================================================
+      UNIVERSAL SORTING (supports Silo-XX numeric sorting)
+  ====================================================== */
+  let sortState = {};
 
-    tableHead.innerHTML =
-      `<tr>${cols.map((c,i)=>`<th data-i="${i}" style="cursor:pointer">${c.l}</th>`).join("")}</tr>`;
+  function enableSorting(tableHead, tableBody) {
+    const headers = tableHead.querySelectorAll("th");
 
-    tableBody.innerHTML = "";
-    data.forEach(row => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = cols.map(c => `<td>${row[c.k] ?? ""}</td>`).join("");
-      tr.onclick = () => openPopup(row.Category);
-      tableBody.appendChild(tr);
-    });
-
-    enableSorting(cols, data);
-  }
-
-  function enableSorting(cols, data) {
-    tableHead.querySelectorAll("th").forEach(th => {
-      th.onclick = () => {
-        const i = th.dataset.i;
-        sortState[i] = sortState[i] === "asc" ? "desc" : "asc";
-
-        data.sort((a,b)=>{
-          let A = a[cols[i].k];
-          let B = b[cols[i].k];
-          if (!isNaN(A) && !isNaN(B)) {
-            return sortState[i] === "asc" ? A-B : B-A;
-          }
-          return sortState[i] === "asc"
-            ? String(A).localeCompare(String(B))
-            : String(B).localeCompare(String(A));
-        });
-
-        renderTable(data);
-      };
+    headers.forEach((th, colIndex) => {
+      th.style.cursor = "pointer";
+      th.addEventListener("click", () => sortTable(tableBody, colIndex));
     });
   }
 
-  /* ----------------------------------------------------
-     View Button (UNCHANGED)
-  ---------------------------------------------------- */
-  viewBtn.onclick = async () => {
-    const hours = hourSelect.value;
-    const from_time = fromDate.value;
-    const to_time   = toDate.value;
+  function sortTable(body, colIndex) {
+    let rows = Array.from(body.querySelectorAll("tr"));
+    sortState[colIndex] = sortState[colIndex] === "asc" ? "desc" : "asc";
 
-    if (hours==="Custom" && (!from_time || !to_time)) {
-      alert("Select From & To");
-      return;
+    rows.sort((a, b) => {
+
+      let A = a.children[colIndex].innerText.trim();
+      let B = b.children[colIndex].innerText.trim();
+
+      /* 🔥 Special Case: Silo-X sorting */
+      const siloPattern = /^silo[-\s]?(\d+)$/i;
+
+      const aMatch = A.match(siloPattern);
+      const bMatch = B.match(siloPattern);
+
+      if (aMatch && bMatch) {
+        const numA = parseInt(aMatch[1]);
+        const numB = parseInt(bMatch[1]);
+
+        return sortState[colIndex] === "asc" ? numA - numB : numB - numA;
+      }
+
+      /* Normal numeric sorting fallback */
+      const numA = parseFloat(A);
+      const numB = parseFloat(B);
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return sortState[colIndex] === "asc" ? numA - numB : numB - numA;
+      }
+
+      /* String sorting */
+      return sortState[colIndex] === "asc"
+        ? A.localeCompare(B)
+        : B.localeCompare(A);
+    });
+
+    body.innerHTML = "";
+    rows.forEach(row => body.appendChild(row));
+  }
+
+  /* ======================================================
+      RESTORE SESSION STORAGE
+  ====================================================== */
+  function restoreSession() {
+    const filters = JSON.parse(sessionStorage.getItem("analytics_filters"));
+    const tableData = JSON.parse(sessionStorage.getItem("analytics_table"));
+    const savedTotal = sessionStorage.getItem("analytics_total");
+
+    if (filters) {
+      hourSelect.value = filters.hours;
+      fromDate.value = filters.from_time;
+      toDate.value = filters.to_time;
     }
 
-    tableHead.innerHTML = "<tr><th>Loading...</th></tr>";
-    tableBody.innerHTML = "<tr><td>Loading...</td></tr>";
+    if (tableData) {
+      renderTable(tableData);
+      totalLabel.textContent = "Total Batch Weight (in Tons): " + savedTotal;
+    }
+  }
+  restoreSession();
 
-    const res = await fetch("/api/analytics_data", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({hours,from_time,to_time})
-    });
+  /* ===== INITIAL DEFAULT LOAD ===== */
+  if (!sessionStorage.getItem("analytics_filters")) {
+    hourSelect.value = "Custom";
+    fromDate.value = "2025-05-01T00:00";
+    toDate.value = "2025-06-30T23:59";
 
-    const r = await res.json();
-    if (!r.success) return;
+    setTimeout(() => viewBtn.click(), 200);
+  }
 
-    currentData = r.data;
-    renderTable(r.data);
-    totalLabel.textContent = `Total Batch Weight (in Tons): ${r.total_weight}`;
 
-    localStorage.setItem("analytics_filters",JSON.stringify({hours,from_time,to_time}));
-    localStorage.setItem("analytics_table",JSON.stringify(r.data));
-    localStorage.setItem("analytics_total",r.total_weight);
-  };
-
-  /* ----------------------------------------------------
-     Export (UNCHANGED)
-  ---------------------------------------------------- */
-  exportBtn.onclick = async () => {
+  /* ======================================================
+      VIEW BUTTON
+  ====================================================== */
+  viewBtn.addEventListener("click", async () => {
+    const hours = hourSelect.value;
     const from_time = fromDate.value;
     const to_time = toDate.value;
 
-    const safeFrom = from_time ? from_time.replace(/[:T]/g,"-") : "AUTO";
-    const safeTo   = to_time ? to_time.replace(/[:T]/g,"-") : "NOW";
+    if (hours === "Custom" && (!from_time || !to_time)) {
+      alert("Please select both From and To for Custom range!");
+      return;
+    }
 
-    const res = await fetch("/api/export_data_analytics",{method:"POST"});
+    tableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
+    tableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
+
+    const res = await fetch("/api/analytics_data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
+
+    const result = await res.json();
+    if (!result.success) return;
+
+    renderTable(result.data);
+    totalLabel.textContent = `Total Batch Weight (in Tons): ${result.total_weight}`;
+
+    // SAVE SESSION
+    sessionStorage.setItem("analytics_filters", JSON.stringify({ hours, from_time, to_time }));
+    sessionStorage.setItem("analytics_table", JSON.stringify(result.data));
+    sessionStorage.setItem("analytics_total", result.total_weight);
+  });
+
+  /* ======================================================
+      EXPORT BUTTON
+  ====================================================== */
+  exportBtn.addEventListener("click", async () => {
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    const res = await fetch("/api/export_data_analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
+    });
+
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
+
+    const safeFrom = from_time.replace(/[:T]/g, "-");
+    const safeTo = to_time.replace(/[:T]/g, "-");
 
     const a = document.createElement("a");
     a.href = url;
     a.download = `SKEW_Analytics_${safeFrom}_to_${safeTo}.xlsx`;
     a.click();
-    URL.revokeObjectURL(url);
-  };
 
-  /* ----------------------------------------------------
-     Popup
-  ---------------------------------------------------- */
-  function openPopup(category) {
-    popup.style.display="flex";
-    popupTitle.textContent = `PLC Data for: ${category}`;
+    URL.revokeObjectURL(url);
+  });
+
+  /* ======================================================
+      ANALYTICS DASH
+  ====================================================== */
+  analyticsBtn.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/analytics/dash");
+      const result = await res.json();
+
+      if (result.success) {
+        window.open(result.url, "_blank");
+      } else {
+        alert("Failed to open analytics dashboard.");
+      }
+    } catch (err) {
+      alert("Error launching dashboard.");
+    }
+  });
+
+  /* ======================================================
+      RENDER MAIN TABLE
+  ====================================================== */
+  function renderTable(data) {
+
+    const cols = [
+      { key: "Category", label: "Category" },
+      { key: "SetWeight", label: "Set Weight (Kg)" },
+      { key: "ActualWeight", label: "Actual Weight (Kg)" },
+      { key: "Error_Kg", label: "Error (Kg)" },
+      { key: "Error_%", label: "Error (%)" }
+    ];
+
+    tableHead.innerHTML = `
+      <tr>${cols.map(c => `<th>${c.label}</th>`).join("")}</tr>
+    `;
+
+    tableBody.innerHTML = "";
+
+    data.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = cols.map(c => `<td>${row[c.key] ?? ""}</td>`).join("");
+      tr.addEventListener("click", () => openPopup(row.Category));
+      tableBody.appendChild(tr);
+    });
+
+    // 🔥 Enable sorting after table is rendered
+    setTimeout(() => enableSorting(tableHead, tableBody), 50);
   }
 
-  closePopup.onclick = () => popup.style.display="none";
+  /* ======================================================
+      POPUP WINDOW
+  ====================================================== */
+  async function openPopup(category) {
+    popup.style.display = "flex";
+    popupTitle.textContent = `PLC Data for: ${category}`;
 
+    popupTableHead.innerHTML = `<tr><th>Loading...</th></tr>`;
+    popupTableBody.innerHTML = `<tr><td>Loading...</td></tr>`;
+
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    const res = await fetch("/api/plc_data_analytics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, hours, from_time, to_time })
+    });
+
+    const result = await res.json();
+    const data = result.data;
+
+    if (!data || data.length === 0) {
+      popupTableHead.innerHTML = `<tr><th>No Data</th></tr>`;
+      popupTableBody.innerHTML = `<tr><td>No PLC Data Available</td></tr>`;
+      return;
+    }
+
+    const allCols = [
+      { key: "Category", label: "Category" },
+      { key: "SetWeight", label: "Set Weight (Kg)" },
+      { key: "ActualWeight", label: "Actual Weight (Kg)" },
+      { key: "FineWeight", label: "Fine Weight (Kg)" },
+      { key: "Error_Kg", label: "Error (Kg)" },
+      { key: "Error_%", label: "Error (%)" },
+      { key: "DiffPerc", label: "Difference (%)" },
+      { key: "DiffKg", label: "Difference (Kg)" },
+      { key: "TimeStamp", label: "Timestamp" }
+    ];
+
+    const cols = allCols.filter(col => col.key in data[0]);
+
+    popupTableHead.innerHTML =
+      `<tr>${cols.map(col => `<th>${col.label}</th>`).join("")}</tr>`;
+
+    popupTableBody.innerHTML =
+      data.map(row =>
+        `<tr>${cols.map(col => `<td>${row[col.key] ?? ""}</td>`).join("")}</tr>`
+      ).join("");
+
+  }
+
+  document.getElementById("downloadPopupExcel").addEventListener("click", async () => {
+    const category = popupTitle.textContent.replace("PLC Data for: ", "");
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
+
+    const res = await fetch("/api/plc_data_analytics_excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, hours, from_time, to_time })
+    });
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `PLC_Data_${category}.xlsx`;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  });
+
+  closePopup.addEventListener("click", () => popup.style.display = "none");
 });
 </script>
 

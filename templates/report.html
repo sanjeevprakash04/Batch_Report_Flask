@@ -44,7 +44,7 @@
   </table>
 </div>
 
-<!-- =============================== POPUP MODAL =============================== -->
+<!-- =============================== POPUP =============================== -->
 <div id="popupModal" class="popup-overlay" style="display:none;">
   <div class="popup-content">
     <h3 id="popupTitle">PLC Data</h3>
@@ -83,25 +83,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const exportBtn  = document.getElementById("exportBtn");
   const totalLabel = document.getElementById("totalLabel");
 
-  const table      = document.getElementById("reportTable");
-  const tableHead  = table.querySelector("thead");
-  const tableBody  = table.querySelector("tbody");
+  const tableHead  = document.querySelector("#reportTable thead");
+  const tableBody  = document.querySelector("#reportTable tbody");
 
   const popup      = document.getElementById("popupModal");
   const popupTitle = document.getElementById("popupTitle");
   const popupHead  = document.querySelector("#popupTable thead");
   const popupBody  = document.querySelector("#popupTable tbody");
+  const closePopup = document.getElementById("closePopup");
 
   /* ================= DATE LIMIT ================= */
   const now = new Date().toISOString().slice(0,16);
-  fromDate.max = now;
-  toDate.max   = now;
+  fromDate.max = toDate.max = now;
 
   fromDate.onclick = toDate.onclick = () => hourSelect.value = "Custom";
   hourSelect.onchange = () => {
     if (hourSelect.value !== "Custom") {
       fromDate.value = "";
-      toDate.value   = "";
+      toDate.value = "";
     }
   };
 
@@ -110,8 +109,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function enableSorting(head, body) {
     head.querySelectorAll("th").forEach((th, i) => {
-      th.style.cursor = "pointer";
       th.onclick = () => sortTable(body, i);
+      th.style.cursor = "pointer";
     });
   }
 
@@ -122,22 +121,25 @@ document.addEventListener("DOMContentLoaded", () => {
     rows.sort((a, b) => {
       let x = a.children[col].innerText.trim();
       let y = b.children[col].innerText.trim();
-      const n = !isNaN(x) && !isNaN(y);
-      if (n) return sortState[col] === "asc" ? x - y : y - x;
-      return sortState[col] === "asc" ? x.localeCompare(y) : y.localeCompare(x);
+      return !isNaN(x) && !isNaN(y)
+        ? (sortState[col] === "asc" ? x - y : y - x)
+        : (sortState[col] === "asc" ? x.localeCompare(y) : y.localeCompare(x));
     });
 
     body.innerHTML = "";
     rows.forEach(r => body.appendChild(r));
   }
 
-  /* ================= RENDER TABLE ================= */
+  /* ================= TABLE ================= */
   function renderTable(data) {
+    if (!data || !data.length) {
+      tableHead.innerHTML = "<tr><th>No Data</th></tr>";
+      tableBody.innerHTML = "<tr><td>No records found</td></tr>";
+      return;
+    }
+
     const cols = Object.keys(data[0]);
-
-    tableHead.innerHTML =
-      `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
-
+    tableHead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
     tableBody.innerHTML = data.map(r =>
       `<tr onclick="openPopup('${r.BatchNo}')">
         ${cols.map(c => `<td>${r[c]}</td>`).join("")}
@@ -147,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => enableSorting(tableHead, tableBody), 10);
   }
 
-  /* ================= RESTORE SESSION ================= */
+  /* ================= RESTORE ================= */
   async function restoreSession() {
     const filters = JSON.parse(localStorage.getItem("report_filters"));
     const table   = JSON.parse(localStorage.getItem("report_table"));
@@ -155,34 +157,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (filters && table) {
       hourSelect.value = filters.hours;
-      fromDate.value   = filters.from_time;
-      toDate.value     = filters.to_time;
+      fromDate.value = filters.from_time;
+      toDate.value = filters.to_time;
       renderTable(table);
       totalLabel.textContent = `Total Batch Weight (in Tons): ${total}`;
       return;
     }
 
-    // Default fetch
-    const res = await fetch("/api/report_data", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ hours: "1 Hr", from_time:"", to_time:"" })
-    });
+    viewBtn.click();
+  }
+  restoreSession();
 
-    const result = await res.json();
-    if (!result.success) return;
+  /* ===== INITIAL DEFAULT LOAD (REPORT) ===== */
+  if (!localStorage.getItem("report_filters")) {
+    hourSelect.value = "Custom";
+    fromDate.value = "2025-05-01T00:00";
+    toDate.value = "2025-06-30T23:59";
 
-    renderTable(result.data);
-    totalLabel.textContent =
-      `Total Batch Weight (in Tons): ${result.total_weight}`;
-
-    localStorage.setItem("report_filters",
-      JSON.stringify({ hours:"1 Hr", from_time:"", to_time:"" }));
-    localStorage.setItem("report_table", JSON.stringify(result.data));
-    localStorage.setItem("report_total", result.total_weight);
+    setTimeout(() => viewBtn.click(), 200);
   }
 
-  restoreSession();
+
 
   /* ================= VIEW ================= */
   viewBtn.onclick = async () => {
@@ -198,43 +193,47 @@ document.addEventListener("DOMContentLoaded", () => {
       body: JSON.stringify(payload)
     });
 
-    const result = await res.json();
-    if (!result.success) return;
+    const r = await res.json();
+    if (!r.success) return;
 
-    renderTable(result.data);
-    totalLabel.textContent =
-      `Total Batch Weight (in Tons): ${result.total_weight}`;
+    renderTable(r.data);
+    totalLabel.textContent = `Total Batch Weight (in Tons): ${r.total_weight}`;
 
     localStorage.setItem("report_filters", JSON.stringify(payload));
-    localStorage.setItem("report_table", JSON.stringify(result.data));
-    localStorage.setItem("report_total", result.total_weight);
+    localStorage.setItem("report_table", JSON.stringify(r.data));
+    localStorage.setItem("report_total", r.total_weight);
   };
 
   /* ================= EXPORT ================= */
-  exportBtn.onclick = async () => {
-    const from = fromDate.value || "AUTO";
-    const to   = toDate.value   || "NOW";
+  exportBtn.addEventListener("click", async () => {
+
+    const hours = hourSelect.value;
+    const from_time = fromDate.value;
+    const to_time = toDate.value;
 
     const res = await fetch("/api/export_data", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        hours: hourSelect.value,
-        from_time: fromDate.value,
-        to_time: toDate.value
-      })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, from_time, to_time })
     });
 
     const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+
+    // Make filename safe (replace ":" with "-")
+    const safeFrom = from_time.replace(/[:T]/g, "-");
+    const safeTo = to_time.replace(/[:T]/g, "-");
+
+    const filename = `SKEW_Batchs_Report_${safeFrom}_to_${safeTo}.xlsx`;
 
     const a = document.createElement("a");
     a.href = url;
-    a.download =
-      `SKEW_Batch_Report_${from.replace(/[:T]/g,"-")}_${to.replace(/[:T]/g,"-")}.xlsx`;
+    a.download = filename;
     a.click();
+
     URL.revokeObjectURL(url);
-  };
+  });
+
 
   /* ================= POPUP ================= */
   window.openPopup = async (batchNo) => {
@@ -247,8 +246,8 @@ document.addEventListener("DOMContentLoaded", () => {
       body: JSON.stringify({ batch_no: batchNo })
     });
 
-    const result = await res.json();
-    const data = result.data || [];
+    const r = await res.json();
+    const data = r.data || [];
 
     if (!data.length) {
       popupHead.innerHTML = "<tr><th>No Data</th></tr>";
@@ -256,20 +255,49 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const cols = Object.keys(data[0]);
-    popupHead.innerHTML =
-      `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+    const cols = [
+      { k:"Category", l:"Category" },
+      { k:"MaterialName", l:"Material Name" },
+      { k:"SetWeight", l:"Set Weight (Kg)" },
+      { k:"ActualWeight", l:"Actual Weight (Kg)" },
+      { k:"Difference", l:"Difference (Kg)" },
+      { k:"Tolerance", l:"Tolerance (Kg)" }
+    ];
+
+    popupHead.innerHTML = `<tr>${cols.map(c => `<th>${c.l}</th>`).join("")}</tr>`;
     popupBody.innerHTML = data.map(r =>
-      `<tr>${cols.map(c => `<td>${r[c]}</td>`).join("")}</tr>`
+      `<tr>${cols.map(c => `<td>${r[c.k] ?? ""}</td>`).join("")}</tr>`
     ).join("");
 
     setTimeout(() => enableSorting(popupHead, popupBody), 10);
+
+    document.getElementById("downloadPDF").onclick = () => downloadReport("pdf", batchNo);
+    document.getElementById("downloadExcel").onclick = () => downloadReport("excel", batchNo);
   };
 
-  document.getElementById("closePopup").onclick =
-    () => popup.style.display = "none";
+  closePopup.onclick = () => popup.style.display = "none";
 
 });
+
+/* ================= DOWNLOAD ================= */
+async function downloadReport(type, batchNo) {
+  const endpoint = type === "pdf" ? "/api/plc_data/pdf" : "/api/plc_data/excel";
+  const ext = type === "pdf" ? "pdf" : "xlsx";
+
+  const res = await fetch(endpoint, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ batch_no: batchNo })
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `BatchReport_${batchNo}.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 </script>
 
 {% endblock %}

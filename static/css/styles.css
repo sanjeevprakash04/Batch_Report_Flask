@@ -88,7 +88,7 @@ body {
 ============================== */
 
 /* 1️⃣ Today's Production → orange value */
-.summary-cards .card:nth-child(1) .value {
+.summary-cards .card:nth-child(3) .value {
     color: #ff7a00;
 }
 
@@ -105,14 +105,14 @@ body {
 }
 
 /* 3️⃣ Tons per Hour → green card */
-.summary-cards .card:nth-child(3) {
+.summary-cards .card:nth-child(1) {
     background: #22c55e;
     color: white;
 }
 
-.summary-cards .card:nth-child(3) h3,
-.summary-cards .card:nth-child(3) .value,
-.summary-cards .card:nth-child(3) .unit {
+.summary-cards .card:nth-child(1) h3,
+.summary-cards .card:nth-child(1) .value,
+.summary-cards .card:nth-child(1) .unit {
     color: white !important;
 }
 
